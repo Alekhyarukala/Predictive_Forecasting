@@ -166,7 +166,7 @@ and enabling proactive healthcare resource planning.
 @st.cache_data
 def load_data():
 
-    df = pd.read_csv("data/uac_data.csv")
+    df = pd.read_csv("uac_data.csv")
 
     df.dropna(inplace=True)
 
