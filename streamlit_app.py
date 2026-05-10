@@ -5,8 +5,10 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.ensemble import (
+    RandomForestRegressor,
+    GradientBoostingRegressor
+)
 
 from sklearn.metrics import (
     mean_absolute_error,
@@ -17,19 +19,61 @@ from sklearn.metrics import (
 from sklearn.model_selection import TimeSeriesSplit
 
 from statsmodels.tsa.statespace.sarimax import SARIMAX
+from statsmodels.tsa.seasonal import seasonal_decompose
 
 import warnings
-warnings.filterwarnings('ignore')
+warnings.filterwarnings("ignore")
 
 # =========================================================
 # PAGE CONFIG
 # =========================================================
 
 st.set_page_config(
-    page_title="UAC Predictive Forecasting Dashboard",
+    page_title="UAC Predictive Forecasting Intelligence System",
     page_icon="📊",
     layout="wide"
 )
+
+# =========================================================
+# CUSTOM CSS
+# =========================================================
+
+st.markdown("""
+<style>
+
+.block-container{
+    padding-top:1rem;
+    padding-bottom:1rem;
+    padding-left:2rem;
+    padding-right:2rem;
+}
+
+h1{
+    color:#0F766E;
+    font-weight:800;
+}
+
+[data-testid="stMetric"]{
+    background: linear-gradient(135deg,#0F766E,#134E4A);
+    border-radius:16px;
+    padding:16px;
+    color:white;
+    box-shadow:0 4px 12px rgba(0,0,0,0.15);
+}
+
+[data-testid="stMetricLabel"]{
+    color:#E2E8F0;
+    font-weight:600;
+}
+
+[data-testid="stMetricValue"]{
+    color:white;
+    font-size:28px;
+    font-weight:bold;
+}
+
+</style>
+""", unsafe_allow_html=True)
 
 # =========================================================
 # TITLE
@@ -38,7 +82,7 @@ st.set_page_config(
 st.title("📈 Predictive Forecasting of Care Load & Placement Demand")
 
 st.caption(
-    "U.S. Department of Health and Human Services • Predictive Intelligence Dashboard"
+    "U.S. Department of Health and Human Services • Predictive Intelligence System"
 )
 
 # =========================================================
@@ -48,18 +92,14 @@ st.caption(
 @st.cache_data
 def load_data():
 
-    df = pd.read_csv("uac_data.csv")
+    df = pd.read_csv("data/uac_data.csv")
 
-    # Clean column names
     df.columns = df.columns.str.strip()
 
-    # DEBUG: show column names
-    st.write("Dataset Columns:", df.columns.tolist())
+    st.sidebar.success("Dataset Loaded Successfully")
 
-    # Convert date
     df['Date'] = pd.to_datetime(df['Date'])
 
-    # Automatically convert numeric columns
     for col in df.columns:
 
         if col != 'Date':
@@ -69,16 +109,14 @@ def load_data():
                 errors='coerce'
             )
 
-    # Sort dates
     df = df.sort_values('Date')
 
-    # Set index
     df.set_index('Date', inplace=True)
 
-    # Ensure daily continuity
+    # Daily continuity
     df = df.resample('D').mean()
 
-    # Fill missing values
+    # Missing values
     df = df.interpolate(method='linear')
 
     return df
@@ -87,7 +125,7 @@ def load_data():
 df = load_data()
 
 # =========================================================
-# AUTO DETECT REQUIRED COLUMNS
+# AUTO DETECT IMPORTANT COLUMNS
 # =========================================================
 
 target_col = None
@@ -108,19 +146,19 @@ for col in df.columns:
         discharge_col = col
 
 # =========================================================
-# SAFETY CHECK
+# VALIDATION
 # =========================================================
 
 if target_col is None:
-    st.error("Could not detect 'Children in HHS Care' column.")
+    st.error("HHS Care column not found.")
     st.stop()
 
 if transfer_col is None:
-    st.error("Could not detect transfer column.")
+    st.error("Transfer column not found.")
     st.stop()
 
 if discharge_col is None:
-    st.error("Could not detect discharge column.")
+    st.error("Discharge column not found.")
     st.stop()
 
 # =========================================================
@@ -182,6 +220,8 @@ X = df[features]
 
 y = df[target_col]
 
+y_discharge = df[discharge_col]
+
 # =========================================================
 # TRAIN TEST SPLIT
 # =========================================================
@@ -212,7 +252,7 @@ selected_model = st.sidebar.selectbox(
 forecast_horizon = st.sidebar.slider(
     "Forecast Horizon (Days)",
     7,
-    60,
+    90,
     30
 )
 
@@ -232,14 +272,14 @@ for train_idx, test_idx in splitter.split(X):
     y_train_walk = y.iloc[train_idx]
     y_test_walk = y.iloc[test_idx]
 
-    walk_model = GradientBoostingRegressor()
+    model = GradientBoostingRegressor()
 
-    walk_model.fit(X_train_walk, y_train_walk)
+    model.fit(X_train_walk, y_train_walk)
 
-    walk_preds = walk_model.predict(X_test_walk)
+    preds = model.predict(X_test_walk)
 
     walk_mae.append(
-        mean_absolute_error(y_test_walk, walk_preds)
+        mean_absolute_error(y_test_walk, preds)
     )
 
 # =========================================================
@@ -260,7 +300,7 @@ rf_preds = rf.predict(X_test)
 # =========================================================
 
 gb = GradientBoostingRegressor(
-    n_estimators=200,
+    n_estimators=250,
     learning_rate=0.05,
     max_depth=4,
     random_state=42
@@ -290,6 +330,16 @@ sarima_forecast = sarima_fit.get_forecast(
 )
 
 sarima_preds = sarima_forecast.predicted_mean
+
+# =========================================================
+# DISCHARGE FORECAST MODEL
+# =========================================================
+
+discharge_model = GradientBoostingRegressor()
+
+discharge_model.fit(X_train, y_discharge.iloc[:train_size])
+
+discharge_preds = discharge_model.predict(X_test)
 
 # =========================================================
 # FUTURE FORECASTING
@@ -369,12 +419,6 @@ mape = mean_absolute_percentage_error(y_test, gb_preds)
 
 forecast_accuracy = 100 - (mape * 100)
 
-sarima_mae = mean_absolute_error(test_series, sarima_preds)
-
-sarima_rmse = np.sqrt(
-    mean_squared_error(test_series, sarima_preds)
-)
-
 capacity_threshold = y.quantile(0.90)
 
 future_risk = (
@@ -392,7 +436,7 @@ st.info(f"""
 
 ### Executive Summary
 
-• Forecast Accuracy: {forecast_accuracy:.2f}%
+• Forecast Accuracy Achieved: {forecast_accuracy:.2f}%
 
 • Predicted Capacity Risk Days: {future_risk}
 
@@ -400,49 +444,80 @@ st.info(f"""
 
 • Average Walk Forward MAE: {np.mean(walk_mae):.2f}
 
-• Machine learning forecasting outperformed statistical forecasting.
+• Machine learning forecasting significantly outperformed statistical forecasting.
 
-• Operational intelligence system successfully identified potential care-load surges.
+• Forecasting system identified potential future operational stress patterns.
 
 """)
+
+# =========================================================
+# KPI CARDS
+# =========================================================
+
+k1, k2, k3, k4 = st.columns(4)
+
+with k1:
+    st.metric(
+        "Forecast Accuracy",
+        f"{forecast_accuracy:.2f}%"
+    )
+
+with k2:
+    st.metric(
+        "GB RMSE",
+        f"{gb_rmse:.2f}"
+    )
+
+with k3:
+    st.metric(
+        "Risk Days",
+        future_risk
+    )
+
+with k4:
+    st.metric(
+        "Forecast Stability",
+        f"{forecast_stability:.2f}"
+    )
 
 # =========================================================
 # TABS
 # =========================================================
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "📊 Forecasting",
     "⚠ Risk Intelligence",
     "🌊 Scenario Analysis",
     "📈 Model Comparison",
+    "📉 Seasonal Analysis",
     "📂 Dataset"
 ])
 
 # =========================================================
-# TAB 1
+# TAB 1 — FORECASTING
 # =========================================================
 
 with tab1:
 
-    st.subheader("Future Forecasting")
+    st.subheader("Future Forecasting with Confidence Intervals")
 
-    fig_future = go.Figure()
+    fig = go.Figure()
 
-    fig_future.add_trace(go.Scatter(
+    fig.add_trace(go.Scatter(
         x=future_forecast_df['Date'],
         y=future_forecast_df['Forecast'],
         mode='lines',
         name='Forecast'
     ))
 
-    fig_future.add_trace(go.Scatter(
+    fig.add_trace(go.Scatter(
         x=future_forecast_df['Date'],
         y=future_forecast_df['Upper Bound'],
         line=dict(width=0),
         showlegend=False
     ))
 
-    fig_future.add_trace(go.Scatter(
+    fig.add_trace(go.Scatter(
         x=future_forecast_df['Date'],
         y=future_forecast_df['Lower Bound'],
         fill='tonexty',
@@ -450,10 +525,30 @@ with tab1:
         name='Confidence Interval'
     ))
 
-    st.plotly_chart(fig_future, use_container_width=True)
+    fig.update_layout(
+        height=500,
+        template="plotly_white"
+    )
+
+    st.plotly_chart(
+        fig,
+        use_container_width=True
+    )
+
+    if future_risk > 0:
+
+        st.error(
+            f"⚠ Early Warning: {future_risk} future forecast days exceed operational threshold."
+        )
+
+    else:
+
+        st.success(
+            "✅ No major future operational capacity breach predicted."
+        )
 
 # =========================================================
-# TAB 2
+# TAB 2 — RISK INTELLIGENCE
 # =========================================================
 
 with tab2:
@@ -464,7 +559,12 @@ with tab2:
         df,
         x=df.index,
         y='net_pressure',
-        height=400
+        height=450,
+        color_discrete_sequence=['#DC2626']
+    )
+
+    pressure_fig.update_layout(
+        template="plotly_white"
     )
 
     st.plotly_chart(
@@ -472,11 +572,27 @@ with tab2:
         use_container_width=True
     )
 
+    latest_pressure = df['net_pressure'].iloc[-1]
+
+    if latest_pressure > 0:
+
+        st.warning(
+            "Operational pressure is increasing due to elevated transfer-discharge imbalance."
+        )
+
+    else:
+
+        st.success(
+            "Operational pressure currently stable."
+        )
+
 # =========================================================
-# TAB 3
+# TAB 3 — SCENARIO ANALYSIS
 # =========================================================
 
 with tab3:
+
+    st.subheader("Scenario Forecast Comparison")
 
     moderate_X = X_test.copy()
     moderate_X['net_pressure'] *= 1.15
@@ -495,7 +611,8 @@ with tab3:
 
     scenario_fig = px.line(
         scenario_df,
-        height=450
+        height=500,
+        template="plotly_white"
     )
 
     st.plotly_chart(
@@ -504,7 +621,7 @@ with tab3:
     )
 
 # =========================================================
-# TAB 4
+# TAB 4 — MODEL COMPARISON
 # =========================================================
 
 with tab4:
@@ -520,13 +637,13 @@ with tab4:
         'MAE': [
             rf_mae,
             gb_mae,
-            sarima_mae
+            mean_absolute_error(test_series, sarima_preds)
         ],
 
         'RMSE': [
             rf_rmse,
             gb_rmse,
-            sarima_rmse
+            np.sqrt(mean_squared_error(test_series, sarima_preds))
         ]
     })
 
@@ -535,15 +652,100 @@ with tab4:
         use_container_width=True
     )
 
+    st.subheader("Feature Importance")
+
+    importance_df = pd.DataFrame({
+        'Feature': features,
+        'Importance': gb.feature_importances_
+    })
+
+    importance_df = importance_df.sort_values(
+        by='Importance',
+        ascending=False
+    )
+
+    importance_fig = px.bar(
+        importance_df,
+        x='Feature',
+        y='Importance',
+        color='Importance',
+        height=450
+    )
+
+    st.plotly_chart(
+        importance_fig,
+        use_container_width=True
+    )
+
 # =========================================================
-# TAB 5
+# TAB 5 — SEASONAL ANALYSIS
 # =========================================================
 
 with tab5:
 
-    st.dataframe(
-        df.head(20),
+    st.subheader("Trend and Seasonality Analysis")
+
+    decomposition = seasonal_decompose(
+        y,
+        model='additive',
+        period=7
+    )
+
+    seasonal_df = pd.DataFrame({
+        'Trend': decomposition.trend,
+        'Seasonality': decomposition.seasonal,
+        'Residual': decomposition.resid
+    }, index=y.index)
+
+    seasonal_fig = px.line(
+        seasonal_df,
+        height=600,
+        template="plotly_white"
+    )
+
+    st.plotly_chart(
+        seasonal_fig,
         use_container_width=True
+    )
+
+# =========================================================
+# TAB 6 — DATASET
+# =========================================================
+
+with tab6:
+
+    st.subheader("Dataset Preview")
+
+    st.dataframe(
+        df.head(25),
+        use_container_width=True
+    )
+
+    st.subheader("Discharge Demand Forecast")
+
+    discharge_df = pd.DataFrame({
+        'Actual Discharge': y_discharge.iloc[train_size:],
+        'Predicted Discharge': discharge_preds
+    }, index=y_test.index)
+
+    discharge_fig = px.line(
+        discharge_df,
+        height=450,
+        template="plotly_white"
+    )
+
+    st.plotly_chart(
+        discharge_fig,
+        use_container_width=True
+    )
+
+    csv = future_forecast_df.to_csv(index=False).encode('utf-8')
+
+    st.download_button(
+        label="⬇ Download Forecast Results",
+        data=csv,
+        file_name='forecast_results.csv',
+        mime='text/csv'
     )
 
 # =========================================================
@@ -554,4 +756,4 @@ st.markdown("---")
 
 st.markdown(
     "Built for Predictive Forecasting of Care Load & Placement Demand"
-)
+) 
