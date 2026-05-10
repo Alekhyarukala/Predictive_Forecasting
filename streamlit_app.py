@@ -92,7 +92,7 @@ st.caption(
 @st.cache_data
 def load_data():
 
-    df = pd.read_csv("data/uac_data.csv")
+    df = pd.read_csv("uac_data.csv")
 
     df.columns = df.columns.str.strip()
 
