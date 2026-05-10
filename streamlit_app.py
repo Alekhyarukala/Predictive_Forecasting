@@ -17,7 +17,6 @@ from sklearn.metrics import (
 from sklearn.model_selection import TimeSeriesSplit
 
 from statsmodels.tsa.statespace.sarimax import SARIMAX
-from statsmodels.tsa.seasonal import seasonal_decompose
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -51,27 +50,29 @@ def load_data():
 
     df = pd.read_csv("uac_data.csv")
 
+    # Clean column names
+    df.columns = df.columns.str.strip()
+
+    # DEBUG: show column names
+    st.write("Dataset Columns:", df.columns.tolist())
+
+    # Convert date
     df['Date'] = pd.to_datetime(df['Date'])
 
-    numeric_cols = [
-        'Children apprehended and placed in CBP custody',
-        'Children in CBP custody',
-        'Children transferred out of CBP custody',
-        'Children in HHS Care',
-        'Children discharged from HHS Care'
-    ]
+    # Automatically convert numeric columns
+    for col in df.columns:
 
-    for col in numeric_cols:
+        if col != 'Date':
 
-        df[col] = (
-            df[col]
-            .astype(str)
-            .str.replace(',', '')
-            .astype(float)
-        )
+            df[col] = pd.to_numeric(
+                df[col].astype(str).str.replace(',', ''),
+                errors='coerce'
+            )
 
+    # Sort dates
     df = df.sort_values('Date')
 
+    # Set index
     df.set_index('Date', inplace=True)
 
     # Ensure daily continuity
@@ -86,41 +87,72 @@ def load_data():
 df = load_data()
 
 # =========================================================
-# SEASONAL DECOMPOSITION
+# AUTO DETECT REQUIRED COLUMNS
 # =========================================================
 
-series = df['Children in HHS Care']
+target_col = None
+transfer_col = None
+discharge_col = None
+
+for col in df.columns:
+
+    lower_col = col.lower()
+
+    if 'hhs care' in lower_col:
+        target_col = col
+
+    if 'transferred' in lower_col:
+        transfer_col = col
+
+    if 'discharged' in lower_col:
+        discharge_col = col
+
+# =========================================================
+# SAFETY CHECK
+# =========================================================
+
+if target_col is None:
+    st.error("Could not detect 'Children in HHS Care' column.")
+    st.stop()
+
+if transfer_col is None:
+    st.error("Could not detect transfer column.")
+    st.stop()
+
+if discharge_col is None:
+    st.error("Could not detect discharge column.")
+    st.stop()
 
 # =========================================================
 # FEATURE ENGINEERING
 # =========================================================
 
-df['lag_1'] = df['Children in HHS Care'].shift(1)
-df['lag_7'] = df['Children in HHS Care'].shift(7)
-df['lag_14'] = df['Children in HHS Care'].shift(14)
+df['lag_1'] = df[target_col].shift(1)
+df['lag_7'] = df[target_col].shift(7)
+df['lag_14'] = df[target_col].shift(14)
 
 df['rolling_mean_7'] = (
-    df['Children in HHS Care']
+    df[target_col]
     .rolling(7)
     .mean()
 )
 
 df['rolling_mean_14'] = (
-    df['Children in HHS Care']
+    df[target_col]
     .rolling(14)
     .mean()
 )
 
 df['rolling_std_7'] = (
-    df['Children in HHS Care']
+    df[target_col]
     .rolling(7)
     .std()
 )
 
 df['net_pressure'] = (
-    df['Children transferred out of CBP custody']
+    df[transfer_col]
     -
-    df['Children discharged from HHS Care']
+    df[discharge_col]
 )
 
 df['dayofweek'] = df.index.dayofweek
@@ -148,9 +180,7 @@ features = [
 
 X = df[features]
 
-y = df['Children in HHS Care']
-
-discharge_target = df['Children discharged from HHS Care']
+y = df[target_col]
 
 # =========================================================
 # TRAIN TEST SPLIT
@@ -193,7 +223,6 @@ forecast_horizon = st.sidebar.slider(
 splitter = TimeSeriesSplit(n_splits=5)
 
 walk_mae = []
-walk_rmse = []
 
 for train_idx, test_idx in splitter.split(X):
 
@@ -213,12 +242,8 @@ for train_idx, test_idx in splitter.split(X):
         mean_absolute_error(y_test_walk, walk_preds)
     )
 
-    walk_rmse.append(
-        np.sqrt(mean_squared_error(y_test_walk, walk_preds))
-    )
-
 # =========================================================
-# MACHINE LEARNING MODELS
+# RANDOM FOREST
 # =========================================================
 
 rf = RandomForestRegressor(
@@ -229,6 +254,10 @@ rf = RandomForestRegressor(
 rf.fit(X_train, y_train)
 
 rf_preds = rf.predict(X_test)
+
+# =========================================================
+# GRADIENT BOOSTING
+# =========================================================
 
 gb = GradientBoostingRegressor(
     n_estimators=200,
@@ -242,14 +271,11 @@ gb.fit(X_train, y_train)
 gb_preds = gb.predict(X_test)
 
 # =========================================================
-# SARIMA MODEL
+# SARIMA
 # =========================================================
 
-series = df['Children in HHS Care']
-
-train_series = series.iloc[:train_size]
-
-test_series = series.iloc[train_size:]
+train_series = y.iloc[:train_size]
+test_series = y.iloc[train_size:]
 
 sarima_model = SARIMAX(
     train_series,
@@ -266,7 +292,7 @@ sarima_forecast = sarima_fit.get_forecast(
 sarima_preds = sarima_forecast.predicted_mean
 
 # =========================================================
-# TRUE FUTURE FORECASTING
+# FUTURE FORECASTING
 # =========================================================
 
 future_dates = pd.date_range(
@@ -284,12 +310,12 @@ for i in range(forecast_horizon):
     latest = last_known.iloc[-1]
 
     next_row = {
-        'lag_1': latest['Children in HHS Care'],
-        'lag_7': last_known['Children in HHS Care'].iloc[-7],
-        'lag_14': last_known['Children in HHS Care'].iloc[-14],
-        'rolling_mean_7': last_known['Children in HHS Care'].tail(7).mean(),
-        'rolling_mean_14': last_known['Children in HHS Care'].tail(14).mean(),
-        'rolling_std_7': last_known['Children in HHS Care'].tail(7).std(),
+        'lag_1': latest[target_col],
+        'lag_7': last_known[target_col].iloc[-7],
+        'lag_14': last_known[target_col].iloc[-14],
+        'rolling_mean_7': last_known[target_col].tail(7).mean(),
+        'rolling_mean_14': last_known[target_col].tail(14).mean(),
+        'rolling_std_7': last_known[target_col].tail(7).std(),
         'net_pressure': latest['net_pressure'],
         'dayofweek': future_dates[i].dayofweek,
         'month': future_dates[i].month,
@@ -304,7 +330,7 @@ for i in range(forecast_horizon):
 
     temp_row = latest.copy()
 
-    temp_row['Children in HHS Care'] = pred
+    temp_row[target_col] = pred
 
     last_known.loc[future_dates[i]] = temp_row
 
@@ -349,7 +375,7 @@ sarima_rmse = np.sqrt(
     mean_squared_error(test_series, sarima_preds)
 )
 
-capacity_threshold = df['Children in HHS Care'].quantile(0.90)
+capacity_threshold = y.quantile(0.90)
 
 future_risk = (
     future_forecast_df['Forecast']
@@ -384,22 +410,21 @@ st.info(f"""
 # TABS
 # =========================================================
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📊 Forecasting",
     "⚠ Risk Intelligence",
     "🌊 Scenario Analysis",
     "📈 Model Comparison",
-    "📂 Dataset",
-    "🗺 Regional Intelligence"
+    "📂 Dataset"
 ])
 
 # =========================================================
-# TAB 1 — FORECASTING
+# TAB 1
 # =========================================================
 
 with tab1:
 
-    st.subheader("Future Forecasting with Confidence Intervals")
+    st.subheader("Future Forecasting")
 
     fig_future = go.Figure()
 
@@ -428,7 +453,7 @@ with tab1:
     st.plotly_chart(fig_future, use_container_width=True)
 
 # =========================================================
-# TAB 2 — RISK INTELLIGENCE
+# TAB 2
 # =========================================================
 
 with tab2:
@@ -439,8 +464,7 @@ with tab2:
         df,
         x=df.index,
         y='net_pressure',
-        height=400,
-        color_discrete_sequence=['#DC2626']
+        height=400
     )
 
     st.plotly_chart(
@@ -449,12 +473,10 @@ with tab2:
     )
 
 # =========================================================
-# TAB 3 — SCENARIO ANALYSIS
+# TAB 3
 # =========================================================
 
 with tab3:
-
-    st.subheader("Scenario Forecast Comparison")
 
     moderate_X = X_test.copy()
     moderate_X['net_pressure'] *= 1.15
@@ -482,7 +504,7 @@ with tab3:
     )
 
 # =========================================================
-# TAB 4 — MODEL COMPARISON
+# TAB 4
 # =========================================================
 
 with tab4:
@@ -514,12 +536,10 @@ with tab4:
     )
 
 # =========================================================
-# TAB 5 — DATASET
+# TAB 5
 # =========================================================
 
 with tab5:
-
-    st.subheader("Dataset Preview")
 
     st.dataframe(
         df.head(20),
@@ -527,34 +547,10 @@ with tab5:
     )
 
 # =========================================================
-# TAB 6 — REGIONAL INTELLIGENCE
-# =========================================================
-
-with tab6:
-
-    map_data = pd.DataFrame({
-
-        'Region': [
-            'Texas',
-            'Arizona',
-            'California',
-            'New Mexico'
-        ],
-
-        'lat': [31.0,34.0,36.0,34.5],
-
-        'lon': [-100.0,-111.0,-119.0,-106.0],
-
-        'Care Load': [12000,9000,7000,5000]
-    })
-
-    st.map(map_data)
-
-# =========================================================
 # FOOTER
 # =========================================================
 
-st.markdown("<hr>", unsafe_allow_html=True)
+st.markdown("---")
 
 st.markdown(
     "Built for Predictive Forecasting of Care Load & Placement Demand"
