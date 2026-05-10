@@ -5,8 +5,6 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 
-from plotly.subplots import make_subplots
-
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.ensemble import GradientBoostingRegressor
 
@@ -23,68 +21,179 @@ from statsmodels.tsa.arima.model import ARIMA
 # =========================================================
 
 st.set_page_config(
-    page_title="UAC Predictive Intelligence System",
+    page_title="UAC Predictive Intelligence Dashboard",
     page_icon="📊",
     layout="wide"
 )
 
 # =========================================================
-# CUSTOM CSS
+# PROFESSIONAL GOVERNMENT DASHBOARD THEME
 # =========================================================
 
 st.markdown("""
 <style>
 
-.main {
-    background-color: #0B1220;
+/* Main App */
+
+.stApp {
+    background-color: #08111F;
 }
 
-h1, h2, h3 {
-    color: #E5E7EB !important;
+/* Layout */
+
+.block-container {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
 }
+
+/* Headings */
+
+h1 {
+    color: #F9FAFB !important;
+    font-weight: 800 !important;
+}
+
+h2 {
+    color: #E5E7EB !important;
+    font-weight: 700 !important;
+}
+
+h3 {
+    color: #CBD5E1 !important;
+    font-weight: 600 !important;
+}
+
+/* Sidebar */
+
+section[data-testid="stSidebar"] {
+    background-color: #0F172A;
+    border-right: 1px solid #1E293B;
+}
+
+/* KPI Cards */
 
 [data-testid="stMetric"] {
-    background-color: #111827;
-    border: 1px solid #1F2937;
-    padding: 14px;
+
+    background: linear-gradient(
+        145deg,
+        #111827,
+        #1F2937
+    );
+
+    border: 1px solid #334155;
+
+    padding: 15px;
+
     border-radius: 14px;
-    text-align: center;
-    box-shadow: 0px 4px 10px rgba(0,0,0,0.3);
+
+    box-shadow:
+        0px 4px 12px rgba(0,0,0,0.35);
 }
 
+/* KPI Label */
+
 [data-testid="stMetricLabel"] {
-    color: #9CA3AF;
+
+    color: #CBD5E1;
+
     font-size: 14px;
+
     font-weight: 600;
 }
 
+/* KPI Value */
+
 [data-testid="stMetricValue"] {
+
     color: white;
+
     font-size: 28px;
-    font-weight: bold;
+
+    font-weight: 800;
 }
 
+/* Tabs */
+
+.stTabs [data-baseweb="tab"] {
+
+    background-color: #111827;
+
+    color: #CBD5E1;
+
+    border-radius: 10px;
+
+    padding: 10px 18px;
+
+    margin-right: 5px;
+
+    font-weight: 600;
+}
+
+.stTabs [aria-selected="true"] {
+
+    background-color: #0EA5E9 !important;
+
+    color: white !important;
+}
+
+/* Alert Boxes */
+
 .alert-high {
+
     background-color: #7F1D1D;
-    padding: 14px;
+
+    border-left: 6px solid #EF4444;
+
+    padding: 16px;
+
     border-radius: 12px;
+
     color: white;
-    font-weight: bold;
+
+    font-weight: 700;
 }
 
 .alert-medium {
+
     background-color: #78350F;
-    padding: 14px;
+
+    border-left: 6px solid #F59E0B;
+
+    padding: 16px;
+
     border-radius: 12px;
+
     color: white;
-    font-weight: bold;
+
+    font-weight: 700;
 }
 
+/* Executive Summary Box */
+
 .executive-box {
+
     background-color: #111827;
-    padding: 18px;
-    border-radius: 14px;
-    border: 1px solid #1F2937;
+
+    border: 1px solid #334155;
+
+    padding: 22px;
+
+    border-radius: 16px;
+
+    color: #E5E7EB;
+
+    line-height: 1.7;
+}
+
+/* Dataframe */
+
+[data-testid="stDataFrame"] {
+
+    border: 1px solid #334155;
+
+    border-radius: 12px;
 }
 
 </style>
@@ -99,9 +208,11 @@ st.title("📈 Predictive Forecasting of Care Load & Placement Demand")
 st.markdown("""
 ### U.S. Department of Health and Human Services
 
-AI-driven operational intelligence system for forecasting UAC care load,
-monitoring operational pressure, predicting discharge demand,
-and enabling proactive healthcare resource planning.
+AI-powered operational intelligence system for:
+- forecasting UAC care load
+- predicting operational pressure
+- monitoring capacity breach risk
+- enabling proactive healthcare planning
 """)
 
 # =========================================================
@@ -281,11 +392,11 @@ mape = mean_absolute_percentage_error(
 
 forecast_accuracy = 100 - (mape * 100)
 
+capacity_risk = 18.4
+
 forecast_confidence = 96.4
 
 stability_score = 92.7
-
-capacity_risk = 18.4
 
 # =========================================================
 # KPI SECTION
@@ -364,7 +475,7 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
 ])
 
 # =========================================================
-# TAB 1
+# TAB 1 — FORECASTING
 # =========================================================
 
 with tab1:
@@ -376,15 +487,12 @@ with tab1:
     forecast_df['Actual'] = y_test.values
 
     if selected_model == "Random Forest":
-
         forecast_df['Forecast'] = rf_preds
 
     elif selected_model == "Gradient Boosting":
-
         forecast_df['Forecast'] = gb_preds
 
     else:
-
         forecast_df['Forecast'] = arima_forecast.values
 
     fig = px.line(
@@ -394,18 +502,26 @@ with tab1:
         template="plotly_dark"
     )
 
+    fig.update_layout(
+        paper_bgcolor="#08111F",
+        plot_bgcolor="#08111F",
+        font=dict(color="white"),
+        title_font=dict(size=22),
+        legend=dict(font=dict(color="white"))
+    )
+
     st.plotly_chart(
         fig,
         use_container_width=True
     )
 
     st.info("""
-    Forecasting models indicate stable short-term forecasting reliability.
-    Lag variables and rolling averages significantly improved prediction accuracy.
+    Forecasting models indicate strong short-term prediction reliability.
+    Lag variables and rolling statistics significantly improved forecasting performance.
     """)
 
 # =========================================================
-# TAB 2
+# TAB 2 — RISK INTELLIGENCE
 # =========================================================
 
 with tab2:
@@ -417,6 +533,12 @@ with tab2:
         x=df.index,
         y='net_pressure',
         template="plotly_dark"
+    )
+
+    fig2.update_layout(
+        paper_bgcolor="#08111F",
+        plot_bgcolor="#08111F",
+        font=dict(color="white")
     )
 
     st.plotly_chart(
@@ -433,13 +555,18 @@ with tab2:
         }
     ))
 
+    gauge.update_layout(
+        paper_bgcolor="#08111F",
+        font=dict(color="white")
+    )
+
     st.plotly_chart(
         gauge,
         use_container_width=True
     )
 
 # =========================================================
-# TAB 3
+# TAB 3 — SCENARIO ANALYSIS
 # =========================================================
 
 with tab3:
@@ -471,13 +598,19 @@ with tab3:
         template="plotly_dark"
     )
 
+    fig3.update_layout(
+        paper_bgcolor="#08111F",
+        plot_bgcolor="#08111F",
+        font=dict(color="white")
+    )
+
     st.plotly_chart(
         fig3,
         use_container_width=True
     )
 
 # =========================================================
-# TAB 4
+# TAB 4 — MODEL COMPARISON
 # =========================================================
 
 with tab4:
@@ -530,13 +663,19 @@ with tab4:
         template="plotly_dark"
     )
 
+    fig4.update_layout(
+        paper_bgcolor="#08111F",
+        plot_bgcolor="#08111F",
+        font=dict(color="white")
+    )
+
     st.plotly_chart(
         fig4,
         use_container_width=True
     )
 
 # =========================================================
-# TAB 5
+# TAB 5 — NATIONAL OPERATIONS
 # =========================================================
 
 with tab5:
@@ -568,37 +707,43 @@ with tab5:
         template="plotly_dark"
     )
 
+    fig5.update_layout(
+        paper_bgcolor="#08111F",
+        plot_bgcolor="#08111F",
+        font=dict(color="white")
+    )
+
     st.plotly_chart(
         fig5,
         use_container_width=True
     )
 
 # =========================================================
-# TAB 6
+# TAB 6 — RESOURCE INTELLIGENCE
 # =========================================================
 
 with tab6:
 
     st.subheader("Resource Allocation Intelligence")
 
-    col1, col2, col3 = st.columns(3)
+    c1, c2, c3 = st.columns(3)
 
-    with col1:
+    with c1:
         st.metric("Shelter Demand", "82%")
 
-    with col2:
+    with c2:
         st.metric("Medical Staffing", "+14%")
 
-    with col3:
+    with c3:
         st.metric("Caseworker Need", "+11%")
 
     st.success("""
-    Forecasting suggests moderate increase in operational staffing requirements
+    Forecasting suggests moderate increase in staffing requirements
     within the next 14 days.
     """)
 
 # =========================================================
-# TAB 7
+# TAB 7 — EMERGENCY SIMULATION
 # =========================================================
 
 with tab7:
@@ -631,7 +776,7 @@ with tab7:
     )
 
 # =========================================================
-# TAB 8
+# TAB 8 — EXECUTIVE SUMMARY
 # =========================================================
 
 with tab8:
@@ -643,20 +788,20 @@ with tab8:
 
     <h4>Operational Summary</h4>
 
-    Forecasting models indicate moderate operational stress across the
-    UAC care system over the next forecasting horizon.
+    Forecasting models indicate moderate operational stress
+    over the next forecasting horizon.
 
-    Gradient Boosting achieved the highest predictive reliability,
-    outperforming traditional ARIMA forecasting approaches.
+    Gradient Boosting achieved the highest predictive accuracy,
+    outperforming traditional ARIMA forecasting methods.
 
-    Key operational risks include:
     <ul>
-    <li>Transfer-discharge imbalance</li>
-    <li>Potential shelter utilization increases</li>
-    <li>Elevated staffing requirements</li>
+    <li>Transfer-discharge imbalance remains a major operational driver.</li>
+    <li>Potential shelter utilization increases are expected.</li>
+    <li>Staffing requirements may rise under surge conditions.</li>
     </ul>
 
-    Recommended Actions:
+    <h4>Recommended Actions</h4>
+
     <ul>
     <li>Increase staffing readiness</li>
     <li>Monitor discharge delays closely</li>
