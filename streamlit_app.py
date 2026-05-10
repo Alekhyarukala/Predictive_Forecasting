@@ -21,25 +21,21 @@ from statsmodels.tsa.arima.model import ARIMA
 # =========================================================
 
 st.set_page_config(
-    page_title="UAC Predictive Intelligence Dashboard",
+    page_title="UAC Predictive Forecasting Dashboard",
     page_icon="📊",
     layout="wide"
 )
 
 # =========================================================
-# PROFESSIONAL GOVERNMENT DASHBOARD THEME
+# CUSTOM STYLING
 # =========================================================
 
 st.markdown("""
 <style>
 
-/* Main App */
-
-.stApp {
-    background-color: #08111F;
+.main {
+    background-color: #071018;
 }
-
-/* Layout */
 
 .block-container {
     padding-top: 1rem;
@@ -48,172 +44,99 @@ st.markdown("""
     padding-right: 1.5rem;
 }
 
-/* Headings */
-
 h1 {
-    color: #F9FAFB !important;
+    color: #00D4FF !important;
     font-weight: 800 !important;
 }
 
-h2 {
-    color: #E5E7EB !important;
-    font-weight: 700 !important;
+h2, h3 {
+    color: #E5F3FF !important;
 }
-
-h3 {
-    color: #CBD5E1 !important;
-    font-weight: 600 !important;
-}
-
-/* Sidebar */
-
-section[data-testid="stSidebar"] {
-    background-color: #0F172A;
-    border-right: 1px solid #1E293B;
-}
-
-/* KPI Cards */
 
 [data-testid="stMetric"] {
-
-    background: linear-gradient(
-        145deg,
-        #111827,
-        #1F2937
-    );
-
-    border: 1px solid #334155;
-
-    padding: 15px;
-
+    background: linear-gradient(145deg,#0E1A25,#122535);
+    border: 1px solid #1F3B52;
+    padding: 16px;
     border-radius: 14px;
-
-    box-shadow:
-        0px 4px 12px rgba(0,0,0,0.35);
+    box-shadow: 0 0 12px rgba(0,212,255,0.15);
 }
-
-/* KPI Label */
 
 [data-testid="stMetricLabel"] {
-
-    color: #CBD5E1;
-
+    color: #9BC9E2;
     font-size: 14px;
-
     font-weight: 600;
 }
-
-/* KPI Value */
 
 [data-testid="stMetricValue"] {
-
-    color: white;
-
+    color: #FFFFFF;
     font-size: 28px;
-
-    font-weight: 800;
+    font-weight: bold;
 }
 
-/* Tabs */
-
-.stTabs [data-baseweb="tab"] {
-
-    background-color: #111827;
-
-    color: #CBD5E1;
-
+.alert-green {
+    background-color: #0F2E1D;
+    border-left: 6px solid #00E676;
+    padding: 14px;
     border-radius: 10px;
-
-    padding: 10px 18px;
-
-    margin-right: 5px;
-
-    font-weight: 600;
-}
-
-.stTabs [aria-selected="true"] {
-
-    background-color: #0EA5E9 !important;
-
-    color: white !important;
-}
-
-/* Alert Boxes */
-
-.alert-high {
-
-    background-color: #7F1D1D;
-
-    border-left: 6px solid #EF4444;
-
-    padding: 16px;
-
-    border-radius: 12px;
-
     color: white;
-
-    font-weight: 700;
+    margin-bottom: 15px;
 }
 
-.alert-medium {
-
-    background-color: #78350F;
-
-    border-left: 6px solid #F59E0B;
-
-    padding: 16px;
-
-    border-radius: 12px;
-
+.alert-yellow {
+    background-color: #3A2B00;
+    border-left: 6px solid #FFC107;
+    padding: 14px;
+    border-radius: 10px;
     color: white;
-
-    font-weight: 700;
+    margin-bottom: 15px;
 }
 
-/* Executive Summary Box */
+.alert-red {
+    background-color: #3A0F12;
+    border-left: 6px solid #FF5252;
+    padding: 14px;
+    border-radius: 10px;
+    color: white;
+    margin-bottom: 15px;
+}
 
 .executive-box {
-
-    background-color: #111827;
-
-    border: 1px solid #334155;
-
-    padding: 22px;
-
+    background: linear-gradient(135deg,#08131d,#102433);
+    padding: 20px;
     border-radius: 16px;
-
-    color: #E5E7EB;
-
-    line-height: 1.7;
-}
-
-/* Dataframe */
-
-[data-testid="stDataFrame"] {
-
-    border: 1px solid #334155;
-
-    border-radius: 12px;
+    border: 1px solid #23445D;
+    margin-bottom: 20px;
 }
 
 </style>
 """, unsafe_allow_html=True)
 
 # =========================================================
-# HEADER
+# TITLE
 # =========================================================
 
 st.title("📈 Predictive Forecasting of Care Load & Placement Demand")
 
 st.markdown("""
-### U.S. Department of Health and Human Services
+<div class='executive-box'>
 
-AI-powered operational intelligence system for:
-- forecasting UAC care load
-- predicting operational pressure
-- monitoring capacity breach risk
-- enabling proactive healthcare planning
-""")
+### Executive Summary
+
+This operational intelligence dashboard enables predictive monitoring of
+future HHS care load, discharge demand, operational pressure,
+capacity breach risk, and emergency surge forecasting.
+
+The system combines:
+
+- Machine Learning Forecasting
+- Time-Series Intelligence
+- Capacity Risk Analytics
+- Early Warning Indicators
+- Scenario Simulation
+- Operational Forecast Monitoring
+
+</div>
+""", unsafe_allow_html=True)
 
 # =========================================================
 # LOAD DATA
@@ -224,7 +147,7 @@ def load_data():
 
     df = pd.read_csv("uac_data.csv")
 
-    df.dropna(inplace=True)
+    df = df.dropna()
 
     df['Date'] = pd.to_datetime(df['Date'])
 
@@ -322,23 +245,25 @@ y_test = y.iloc[train_size:]
 st.sidebar.header("⚙ Forecast Controls")
 
 selected_model = st.sidebar.selectbox(
-    "Forecasting Model",
-    ["Gradient Boosting", "Random Forest", "ARIMA"]
+    "Select Forecasting Model",
+    [
+        "Gradient Boosting",
+        "Random Forest",
+        "ARIMA"
+    ]
 )
 
-forecast_horizon = st.sidebar.slider(
+forecast_horizon = st.sidebar.selectbox(
     "Forecast Horizon",
-    7,
-    60,
-    30
+    [7,14,30,60]
 )
 
 # =========================================================
-# MODELS
+# RANDOM FOREST
 # =========================================================
 
 rf = RandomForestRegressor(
-    n_estimators=100,
+    n_estimators=120,
     random_state=42
 )
 
@@ -346,11 +271,19 @@ rf.fit(X_train, y_train)
 
 rf_preds = rf.predict(X_test)
 
+# =========================================================
+# GRADIENT BOOSTING
+# =========================================================
+
 gb = GradientBoostingRegressor()
 
 gb.fit(X_train, y_train)
 
 gb_preds = gb.predict(X_test)
+
+# =========================================================
+# ARIMA
+# =========================================================
 
 series = df['Children in HHS Care']
 
@@ -392,225 +325,265 @@ mape = mean_absolute_percentage_error(
 
 forecast_accuracy = 100 - (mape * 100)
 
-capacity_risk = 18.4
+arima_mae = mean_absolute_error(
+    test_series,
+    arima_forecast
+)
 
-forecast_confidence = 96.4
+arima_rmse = np.sqrt(
+    mean_squared_error(
+        test_series,
+        arima_forecast
+    )
+)
 
-stability_score = 92.7
+# =========================================================
+# ALERTS
+# =========================================================
+
+latest_pressure = df['net_pressure'].iloc[-1]
+
+if latest_pressure < 0:
+
+    st.markdown("""
+    <div class='alert-green'>
+    🟢 LOW RISK: Operational pressure remains stable.
+    </div>
+    """, unsafe_allow_html=True)
+
+elif latest_pressure < 300:
+
+    st.markdown("""
+    <div class='alert-yellow'>
+    🟡 MODERATE SURGE RISK: Elevated intake pressure detected.
+    </div>
+    """, unsafe_allow_html=True)
+
+else:
+
+    st.markdown("""
+    <div class='alert-red'>
+    🔴 HIGH CAPACITY ALERT: Potential operational overload detected.
+    </div>
+    """, unsafe_allow_html=True)
 
 # =========================================================
 # KPI SECTION
 # =========================================================
 
-col1, col2, col3, col4, col5, col6 = st.columns(6)
+k1,k2,k3,k4,k5 = st.columns(5)
 
-with col1:
+with k1:
     st.metric(
         "Forecast Accuracy",
         f"{forecast_accuracy:.2f}%"
     )
 
-with col2:
-    st.metric(
-        "GB RMSE",
-        f"{gb_rmse:.2f}"
-    )
-
-with col3:
+with k2:
     st.metric(
         "GB MAE",
         f"{gb_mae:.2f}"
     )
 
-with col4:
+with k3:
     st.metric(
-        "Confidence",
-        f"{forecast_confidence}%"
+        "GB RMSE",
+        f"{gb_rmse:.2f}"
     )
 
-with col5:
+with k4:
     st.metric(
-        "Stability",
-        f"{stability_score}%"
+        "Operational Pressure",
+        f"{latest_pressure:.0f}"
     )
 
-with col6:
+with k5:
     st.metric(
-        "Capacity Risk",
-        f"{capacity_risk}%"
-    )
-
-# =========================================================
-# ALERT BANNER
-# =========================================================
-
-if capacity_risk > 50:
-
-    st.markdown(
-        '<div class="alert-high">⚠ HIGH RISK OF CAPACITY BREACH DETECTED</div>',
-        unsafe_allow_html=True
-    )
-
-else:
-
-    st.markdown(
-        '<div class="alert-medium">⚠ MODERATE OPERATIONAL PRESSURE DETECTED</div>',
-        unsafe_allow_html=True
+        "Dataset Size",
+        len(df)
     )
 
 # =========================================================
 # TABS
 # =========================================================
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
-
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "📊 Forecasting",
     "⚠ Risk Intelligence",
     "🌊 Scenario Analysis",
     "📈 Model Comparison",
-    "🗺 National Operations",
-    "🏥 Resource Intelligence",
-    "🚨 Emergency Simulation",
-    "📋 Executive Summary"
+    "🗺 Regional Intelligence",
+    "🏥 Operations Center",
+    "📂 Dataset"
 ])
 
 # =========================================================
-# TAB 1 — FORECASTING
+# TAB 1
 # =========================================================
 
 with tab1:
 
-    st.subheader("Future Care Load Forecast")
+    col1, col2 = st.columns([3,1])
 
-    forecast_df = pd.DataFrame(index=y_test.index)
+    with col1:
 
-    forecast_df['Actual'] = y_test.values
+        forecast_df = pd.DataFrame(index=y_test.index)
 
-    if selected_model == "Random Forest":
-        forecast_df['Forecast'] = rf_preds
+        forecast_df['Actual'] = y_test.values
 
-    elif selected_model == "Gradient Boosting":
-        forecast_df['Forecast'] = gb_preds
+        if selected_model == "Random Forest":
+            forecast_df['Forecast'] = rf_preds
 
-    else:
-        forecast_df['Forecast'] = arima_forecast.values
+        elif selected_model == "Gradient Boosting":
+            forecast_df['Forecast'] = gb_preds
 
-    fig = px.line(
-        forecast_df,
-        x=forecast_df.index,
-        y=forecast_df.columns,
-        template="plotly_dark"
-    )
+        else:
+            forecast_df['Forecast'] = arima_forecast.values
 
-    fig.update_layout(
-        paper_bgcolor="#08111F",
-        plot_bgcolor="#08111F",
-        font=dict(color="white"),
-        title_font=dict(size=22),
-        legend=dict(font=dict(color="white"))
-    )
+        upper_band = forecast_df['Forecast'] + 120
+        lower_band = forecast_df['Forecast'] - 120
 
-    st.plotly_chart(
-        fig,
-        use_container_width=True
-    )
+        fig = go.Figure()
 
-    st.info("""
-    Forecasting models indicate strong short-term prediction reliability.
-    Lag variables and rolling statistics significantly improved forecasting performance.
-    """)
+        fig.add_trace(go.Scatter(
+            x=forecast_df.index,
+            y=forecast_df['Actual'],
+            mode='lines',
+            name='Actual'
+        ))
+
+        fig.add_trace(go.Scatter(
+            x=forecast_df.index,
+            y=forecast_df['Forecast'],
+            mode='lines',
+            name='Forecast'
+        ))
+
+        fig.add_trace(go.Scatter(
+            x=forecast_df.index,
+            y=upper_band,
+            line=dict(width=0),
+            showlegend=False
+        ))
+
+        fig.add_trace(go.Scatter(
+            x=forecast_df.index,
+            y=lower_band,
+            fill='tonexty',
+            line=dict(width=0),
+            name='Confidence Interval'
+        ))
+
+        fig.update_layout(
+            height=500,
+            template='plotly_dark',
+            title='Forecast vs Actual'
+        )
+
+        st.plotly_chart(
+            fig,
+            use_container_width=True
+        )
+
+    with col2:
+
+        utilization = min(
+            int((df['Children in HHS Care'].iloc[-1] / threshold) * 100),
+            100
+        )
+
+        gauge = go.Figure(go.Indicator(
+            mode = "gauge+number",
+            value = utilization,
+            title = {'text': "Capacity Utilization"},
+            gauge = {
+                'axis': {'range': [0,100]},
+                'bar': {'color': "#00D4FF"},
+                'steps': [
+                    {'range': [0,60], 'color': "#0F2E1D"},
+                    {'range': [60,85], 'color': "#3A2B00"},
+                    {'range': [85,100], 'color': "#3A0F12"}
+                ]
+            }
+        ))
+
+        gauge.update_layout(
+            height=400,
+            template='plotly_dark'
+        )
+
+        st.plotly_chart(
+            gauge,
+            use_container_width=True
+        )
 
 # =========================================================
-# TAB 2 — RISK INTELLIGENCE
+# TAB 2
 # =========================================================
 
 with tab2:
 
-    st.subheader("Operational Pressure Intelligence")
-
-    fig2 = px.area(
+    fig_pressure = px.line(
         df,
         x=df.index,
         y='net_pressure',
-        template="plotly_dark"
-    )
-
-    fig2.update_layout(
-        paper_bgcolor="#08111F",
-        plot_bgcolor="#08111F",
-        font=dict(color="white")
+        title='Operational Pressure Monitoring',
+        template='plotly_dark'
     )
 
     st.plotly_chart(
-        fig2,
+        fig_pressure,
         use_container_width=True
     )
 
-    gauge = go.Figure(go.Indicator(
-        mode="gauge+number",
-        value=capacity_risk,
-        title={'text': "Capacity Breach Probability"},
-        gauge={
-            'axis': {'range': [0, 100]}
-        }
-    ))
+    st.info("""
+    Early-warning systems help HHS planners:
 
-    gauge.update_layout(
-        paper_bgcolor="#08111F",
-        font=dict(color="white")
-    )
-
-    st.plotly_chart(
-        gauge,
-        use_container_width=True
-    )
+    • Prevent overcrowding  
+    • Prepare medical staff  
+    • Scale shelters proactively  
+    • Reduce operational burnout  
+    """)
 
 # =========================================================
-# TAB 3 — SCENARIO ANALYSIS
+# TAB 3
 # =========================================================
 
 with tab3:
-
-    st.subheader("Scenario Forecast Simulation")
 
     moderate_X = X_test.copy()
 
     moderate_X['net_pressure'] *= 1.15
 
-    moderate_preds = gb.predict(moderate_X)
-
     extreme_X = X_test.copy()
 
     extreme_X['net_pressure'] *= 1.30
 
+    moderate_preds = gb.predict(moderate_X)
+
     extreme_preds = gb.predict(extreme_X)
 
     scenario_df = pd.DataFrame({
-
         'Normal': gb_preds,
         'Moderate Surge': moderate_preds,
         'Extreme Surge': extreme_preds
-
     }, index=y_test.index)
 
-    fig3 = px.line(
+    fig_scenario = px.line(
         scenario_df,
-        template="plotly_dark"
-    )
-
-    fig3.update_layout(
-        paper_bgcolor="#08111F",
-        plot_bgcolor="#08111F",
-        font=dict(color="white")
+        x=scenario_df.index,
+        y=scenario_df.columns,
+        template='plotly_dark',
+        title='Emergency Surge Simulation'
     )
 
     st.plotly_chart(
-        fig3,
+        fig_scenario,
         use_container_width=True
     )
 
 # =========================================================
-# TAB 4 — MODEL COMPARISON
+# TAB 4
 # =========================================================
 
 with tab4:
@@ -626,16 +599,13 @@ with tab4:
         'MAE': [
             rf_mae,
             gb_mae,
-            mean_absolute_error(test_series, arima_forecast)
+            arima_mae
         ],
 
         'RMSE': [
             rf_rmse,
             gb_rmse,
-            np.sqrt(mean_squared_error(
-                test_series,
-                arima_forecast
-            ))
+            arima_rmse
         ]
     })
 
@@ -644,11 +614,11 @@ with tab4:
         use_container_width=True
     )
 
+    importance = gb.feature_importances_
+
     feature_importance = pd.DataFrame({
-
         'Feature': features,
-        'Importance': gb.feature_importances_
-
+        'Importance': importance
     })
 
     feature_importance = feature_importance.sort_values(
@@ -656,160 +626,120 @@ with tab4:
         ascending=False
     )
 
-    fig4 = px.bar(
+    fig_importance = px.bar(
         feature_importance,
         x='Feature',
         y='Importance',
-        template="plotly_dark"
-    )
-
-    fig4.update_layout(
-        paper_bgcolor="#08111F",
-        plot_bgcolor="#08111F",
-        font=dict(color="white")
+        template='plotly_dark',
+        title='Feature Importance'
     )
 
     st.plotly_chart(
-        fig4,
+        fig_importance,
         use_container_width=True
     )
 
 # =========================================================
-# TAB 5 — NATIONAL OPERATIONS
+# TAB 5
 # =========================================================
 
 with tab5:
 
-    st.subheader("National Operations Center")
-
-    map_df = pd.DataFrame({
-
+    region_df = pd.DataFrame({
         'Region': [
-            'Texas Intake',
-            'Arizona Processing',
-            'California Transit',
-            'Federal Network'
+            'Texas',
+            'Arizona',
+            'California',
+            'New Mexico'
         ],
-
-        'Stress Level': [
-            72,
-            64,
-            48,
-            59
-        ]
+        'Load': [4200,3100,2800,1900]
     })
 
-    fig5 = px.bar(
-        map_df,
-        x='Region',
-        y='Stress Level',
-        color='Stress Level',
-        template="plotly_dark"
-    )
-
-    fig5.update_layout(
-        paper_bgcolor="#08111F",
-        plot_bgcolor="#08111F",
-        font=dict(color="white")
+    fig_map = px.scatter_geo(
+        region_df,
+        locations='Region',
+        locationmode='USA-states',
+        size='Load',
+        scope='usa',
+        template='plotly_dark',
+        title='Regional Flow Monitoring'
     )
 
     st.plotly_chart(
-        fig5,
+        fig_map,
         use_container_width=True
     )
 
 # =========================================================
-# TAB 6 — RESOURCE INTELLIGENCE
+# TAB 6
 # =========================================================
 
 with tab6:
 
-    st.subheader("Resource Allocation Intelligence")
+    st.subheader("National Operations Center")
 
-    c1, c2, c3 = st.columns(3)
+    c1,c2 = st.columns(2)
 
     with c1:
-        st.metric("Shelter Demand", "82%")
+
+        staff_needed = int(
+            df['Children in HHS Care'].iloc[-1] / 50
+        )
+
+        st.metric(
+            "Estimated Staff Requirement",
+            staff_needed
+        )
 
     with c2:
-        st.metric("Medical Staffing", "+14%")
 
-    with c3:
-        st.metric("Caseworker Need", "+11%")
+        shelters = int(
+            df['Children in HHS Care'].iloc[-1] / 120
+        )
 
-    st.success("""
-    Forecasting suggests moderate increase in staffing requirements
-    within the next 14 days.
-    """)
+        st.metric(
+            "Estimated Shelter Capacity",
+            shelters
+        )
+
+    fig_load = px.area(
+        df,
+        x=df.index,
+        y='Children in HHS Care',
+        template='plotly_dark',
+        title='Shelter Utilization Trend'
+    )
+
+    st.plotly_chart(
+        fig_load,
+        use_container_width=True
+    )
 
 # =========================================================
-# TAB 7 — EMERGENCY SIMULATION
+# TAB 7
 # =========================================================
 
 with tab7:
 
-    st.subheader("Emergency Surge Simulation")
-
-    intake_increase = st.slider(
-        "Increase Intake %",
-        0,
-        50,
-        15
+    st.dataframe(
+        df.head(),
+        use_container_width=True
     )
 
-    discharge_drop = st.slider(
-        "Reduce Discharge %",
-        0,
-        50,
-        10
+    results_df = pd.DataFrame({
+        'Actual': y_test,
+        'Random Forest': rf_preds,
+        'Gradient Boosting': gb_preds
+    })
+
+    csv = results_df.to_csv(index=True).encode('utf-8')
+
+    st.download_button(
+        label="Download Forecast Results",
+        data=csv,
+        file_name='forecast_results.csv',
+        mime='text/csv'
     )
-
-    simulated_risk = (
-        intake_increase * 1.5
-        +
-        discharge_drop
-    )
-
-    st.metric(
-        "Simulated Risk Level",
-        f"{simulated_risk:.1f}%"
-    )
-
-# =========================================================
-# TAB 8 — EXECUTIVE SUMMARY
-# =========================================================
-
-with tab8:
-
-    st.subheader("Executive Summary")
-
-    st.markdown("""
-    <div class="executive-box">
-
-    <h4>Operational Summary</h4>
-
-    Forecasting models indicate moderate operational stress
-    over the next forecasting horizon.
-
-    Gradient Boosting achieved the highest predictive accuracy,
-    outperforming traditional ARIMA forecasting methods.
-
-    <ul>
-    <li>Transfer-discharge imbalance remains a major operational driver.</li>
-    <li>Potential shelter utilization increases are expected.</li>
-    <li>Staffing requirements may rise under surge conditions.</li>
-    </ul>
-
-    <h4>Recommended Actions</h4>
-
-    <ul>
-    <li>Increase staffing readiness</li>
-    <li>Monitor discharge delays closely</li>
-    <li>Prepare surge-response infrastructure</li>
-    </ul>
-
-    </div>
-    """, unsafe_allow_html=True)
 
 # =========================================================
 # FOOTER
@@ -817,6 +747,14 @@ with tab8:
 
 st.markdown("---")
 
-st.caption("""
-Predictive Intelligence Platform for HHS Operational Forecasting
+st.markdown("""
+### Predictive Intelligence for Healthcare & Public-Sector Operations
+
+This dashboard demonstrates:
+
+- Time-Series Forecasting
+- Early Warning Systems
+- Capacity Intelligence
+- Healthcare Operations Analytics
+- Government Resource Planning
 """)
