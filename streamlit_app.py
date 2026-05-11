@@ -1,6 +1,7 @@
 import warnings
 
 warnings.filterwarnings("ignore")
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -21,6 +22,7 @@ from sklearn.metrics import (
 
 from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.seasonal import seasonal_decompose
+from statsmodels.tsa.statespace.sarimax import SARIMAX
 
 # =========================================================
 # PAGE CONFIG
@@ -156,8 +158,6 @@ def load_data():
 
     df = pd.read_csv("uac_data.csv")
 
-    df.dropna(inplace=True)
-
     df['Date'] = pd.to_datetime(df['Date'])
 
     numeric_cols = [
@@ -181,6 +181,8 @@ def load_data():
     df = df.sort_values('Date')
 
     df.set_index('Date', inplace=True)
+
+    df = df.interpolate()
 
     return df
 
@@ -271,7 +273,12 @@ st.sidebar.header("⚙ Forecast Controls")
 
 selected_model = st.sidebar.selectbox(
     "Forecasting Model",
-    ["Gradient Boosting", "Random Forest", "ARIMA"]
+    [
+        "Gradient Boosting",
+        "Random Forest",
+        "ARIMA",
+        "SARIMA"
+    ]
 )
 
 forecast_horizon = st.sidebar.slider(
@@ -286,7 +293,10 @@ forecast_horizon = st.sidebar.slider(
 # =========================================================
 
 naive_forecast = y_test.shift(1)
-moving_avg_forecast = y_train.rolling(7).mean().iloc[-1]
+
+moving_avg_forecast = (
+    y_train.rolling(7).mean().iloc[-1]
+)
 
 # =========================================================
 # RANDOM FOREST
@@ -317,9 +327,14 @@ gb_preds = gb.predict(X_test)
 
 discharge_model = GradientBoostingRegressor()
 
-discharge_model.fit(X_train, discharge_train)
+discharge_model.fit(
+    X_train,
+    discharge_train
+)
 
-discharge_preds = discharge_model.predict(X_test)
+discharge_preds = discharge_model.predict(
+    X_test
+)
 
 # =========================================================
 # ARIMA MODEL
@@ -343,6 +358,24 @@ arima_forecast = arima_fit.forecast(
 )
 
 # =========================================================
+# SARIMA MODEL
+# =========================================================
+
+sarima_model = SARIMAX(
+    train_series,
+    order=(2,1,2),
+    seasonal_order=(1,1,1,7)
+)
+
+sarima_fit = sarima_model.fit(
+    disp=False
+)
+
+sarima_forecast = sarima_fit.forecast(
+    steps=len(test_series)
+)
+
+# =========================================================
 # WALK FORWARD VALIDATION
 # =========================================================
 
@@ -352,7 +385,10 @@ history = list(train_series)
 
 for t in range(len(test_series)):
 
-    model = ARIMA(history, order=(2,1,1))
+    model = ARIMA(
+        history,
+        order=(2,1,1)
+    )
 
     model_fit = model.fit()
 
@@ -370,16 +406,28 @@ for t in range(len(test_series)):
 # METRICS
 # =========================================================
 
-rf_mae = mean_absolute_error(y_test, rf_preds)
-
-rf_rmse = np.sqrt(
-    mean_squared_error(y_test, rf_preds)
+rf_mae = mean_absolute_error(
+    y_test,
+    rf_preds
 )
 
-gb_mae = mean_absolute_error(y_test, gb_preds)
+rf_rmse = np.sqrt(
+    mean_squared_error(
+        y_test,
+        rf_preds
+    )
+)
+
+gb_mae = mean_absolute_error(
+    y_test,
+    gb_preds
+)
 
 gb_rmse = np.sqrt(
-    mean_squared_error(y_test, gb_preds)
+    mean_squared_error(
+        y_test,
+        gb_preds
+    )
 )
 
 arima_mae = mean_absolute_error(
@@ -391,6 +439,18 @@ arima_rmse = np.sqrt(
     mean_squared_error(
         test_series,
         arima_forecast
+    )
+)
+
+sarima_mae = mean_absolute_error(
+    test_series,
+    sarima_forecast
+)
+
+sarima_rmse = np.sqrt(
+    mean_squared_error(
+        test_series,
+        sarima_forecast
     )
 )
 
@@ -413,27 +473,124 @@ capacity_threshold = y.max() * 1.10
 capacity_risk = min(
     100,
     (
-        max(gb_preds) / capacity_threshold
+        max(gb_preds)
+        /
+        capacity_threshold
     ) * 100
 )
 
 surge_lead_time = 12
 
+forecast_variability = np.std(gb_preds)
+
+uncertainty_score = (
+    forecast_variability
+    /
+    np.mean(gb_preds)
+) * 100
+
+# =========================================================
+# HORIZON ERROR ANALYSIS
+# =========================================================
+
+short_horizon = 7
+
+medium_horizon = 30
+
+short_mae = mean_absolute_error(
+    y_test[:short_horizon],
+    gb_preds[:short_horizon]
+)
+
+medium_mae = mean_absolute_error(
+    y_test[:medium_horizon],
+    gb_preds[:medium_horizon]
+)
+
 # =========================================================
 # CONFIDENCE INTERVALS
 # =========================================================
 
-forecast_std = np.std(gb_preds - y_test)
+forecast_std = np.std(
+    gb_preds - y_test
+)
 
-upper_bound = gb_preds + (1.96 * forecast_std)
+upper_bound = gb_preds + (
+    1.96 * forecast_std
+)
 
-lower_bound = gb_preds - (1.96 * forecast_std)
+lower_bound = gb_preds - (
+    1.96 * forecast_std
+)
+
+# =========================================================
+# FUTURE FORECASTING
+# =========================================================
+
+future_forecast = []
+
+last_data = X.iloc[-1:].copy()
+
+for i in range(forecast_horizon):
+
+    pred = gb.predict(last_data)[0]
+
+    future_forecast.append(pred)
+
+future_dates = pd.date_range(
+    start=df.index[-1],
+    periods=forecast_horizon + 1,
+    freq='D'
+)[1:]
+
+future_df = pd.DataFrame({
+
+    'Date': future_dates,
+    'Forecast': future_forecast
+
+})
+
+# =========================================================
+# BREACH DETECTION
+# =========================================================
+
+breach_days = future_df[
+    future_df['Forecast']
+    > capacity_threshold
+]
+
+# =========================================================
+# FEATURE IMPORTANCE
+# =========================================================
+
+importance_df = pd.DataFrame({
+
+    'Feature': features,
+    'Importance': gb.feature_importances_
+
+}).sort_values(
+    by='Importance',
+    ascending=False
+)
+
+# =========================================================
+# RISK LEVEL
+# =========================================================
+
+if capacity_risk < 30:
+    risk_level = "LOW"
+
+elif capacity_risk < 70:
+    risk_level = "MODERATE"
+
+else:
+    risk_level = "SEVERE"
 
 # =========================================================
 # KPI SECTION
 # =========================================================
 
-col1, col2, col3, col4, col5, col6 = st.columns(6)
+col1, col2, col3, col4 = st.columns(4)
 
 with col1:
     st.metric(
@@ -443,36 +600,24 @@ with col1:
 
 with col2:
     st.metric(
-        "GB RMSE",
-        f"{gb_rmse:.2f}"
-    )
-
-with col3:
-    st.metric(
-        "GB MAE",
-        f"{gb_mae:.2f}"
-    )
-
-with col4:
-    st.metric(
-        "Confidence",
-        f"{forecast_confidence}%"
-    )
-
-with col5:
-    st.metric(
-        "Stability",
-        f"{stability_score}%"
-    )
-
-with col6:
-    st.metric(
         "Capacity Risk",
         f"{capacity_risk:.2f}%"
     )
 
+with col3:
+    st.metric(
+        "Uncertainty",
+        f"{uncertainty_score:.2f}%"
+    )
+
+with col4:
+    st.metric(
+        "Risk Level",
+        risk_level
+    )
+
 # =========================================================
-# ALERT BANNER
+# ALERTS
 # =========================================================
 
 if capacity_risk > 50:
@@ -493,7 +638,7 @@ else:
 # TABS
 # =========================================================
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12 = st.tabs([
 
     "📊 Forecasting",
     "📉 Confidence Intervals",
@@ -502,9 +647,12 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
     "📈 Model Comparison",
     "🏥 Discharge Forecast",
     "🗺 National Operations",
-    "📊 Time Series Decomposition",
+    "📊 Decomposition",
     "🚨 Emergency Simulation",
-    "📋 Executive Summary"
+    "📋 Executive Summary",
+    "🔮 Future Outlook",
+    "🧠 AI Explainability"
+
 ])
 
 # =========================================================
@@ -524,35 +672,39 @@ def apply_light_theme(fig):
         font=dict(
             color="#0F172A",
             size=14
-        ),
-
-        title_font=dict(
-            color="#0F172A",
-            size=22
         )
     )
 
     return fig
 
 # =========================================================
-# TAB 1 - FORECAST
+# TAB 1
 # =========================================================
 
 with tab1:
 
     st.subheader("Future Care Load Forecast")
 
-    forecast_df = pd.DataFrame(index=y_test.index)
+    forecast_df = pd.DataFrame(
+        index=y_test.index
+    )
 
     forecast_df['Actual'] = y_test.values
 
     if selected_model == "Random Forest":
+
         forecast_df['Forecast'] = rf_preds
 
     elif selected_model == "Gradient Boosting":
+
         forecast_df['Forecast'] = gb_preds
 
+    elif selected_model == "SARIMA":
+
+        forecast_df['Forecast'] = sarima_forecast.values
+
     else:
+
         forecast_df['Forecast'] = arima_forecast.values
 
     fig = go.Figure()
@@ -562,7 +714,10 @@ with tab1:
         y=forecast_df['Actual'],
         mode='lines',
         name='Actual',
-        line=dict(color='#2563EB', width=3)
+        line=dict(
+            color='#2563EB',
+            width=3
+        )
     ))
 
     fig.add_trace(go.Scatter(
@@ -570,7 +725,10 @@ with tab1:
         y=forecast_df['Forecast'],
         mode='lines',
         name='Forecast',
-        line=dict(color='#0F766E', width=3)
+        line=dict(
+            color='#0F766E',
+            width=3
+        )
     ))
 
     apply_light_theme(fig)
@@ -581,12 +739,14 @@ with tab1:
     )
 
 # =========================================================
-# TAB 2 - CONFIDENCE INTERVALS
+# TAB 2
 # =========================================================
 
 with tab2:
 
-    st.subheader("Confidence Interval Visualization")
+    st.subheader(
+        "Confidence Interval Visualization"
+    )
 
     fig_ci = go.Figure()
 
@@ -594,8 +754,7 @@ with tab2:
         x=y_test.index,
         y=gb_preds,
         mode='lines',
-        name='Forecast',
-        line=dict(color='#2563EB')
+        name='Forecast'
     ))
 
     fig_ci.add_trace(go.Scatter(
@@ -624,12 +783,14 @@ with tab2:
     )
 
 # =========================================================
-# TAB 3 - RISK
+# TAB 3
 # =========================================================
 
 with tab3:
 
-    st.subheader("Operational Pressure Intelligence")
+    st.subheader(
+        "Operational Pressure Intelligence"
+    )
 
     fig2 = px.area(
         df,
@@ -646,22 +807,30 @@ with tab3:
     )
 
 # =========================================================
-# TAB 4 - SCENARIOS
+# TAB 4
 # =========================================================
 
 with tab4:
 
-    st.subheader("Scenario Forecast Simulation")
+    st.subheader(
+        "Scenario Forecast Simulation"
+    )
 
     moderate_X = X_test.copy()
+
     moderate_X['net_pressure'] *= 1.15
 
-    moderate_preds = gb.predict(moderate_X)
+    moderate_preds = gb.predict(
+        moderate_X
+    )
 
     extreme_X = X_test.copy()
+
     extreme_X['net_pressure'] *= 1.30
 
-    extreme_preds = gb.predict(extreme_X)
+    extreme_preds = gb.predict(
+        extreme_X
+    )
 
     scenario_df = pd.DataFrame({
 
@@ -672,12 +841,7 @@ with tab4:
     }, index=y_test.index)
 
     fig3 = px.line(
-        scenario_df,
-        color_discrete_sequence=[
-            "#2563EB",
-            "#D97706",
-            "#DC2626"
-        ]
+        scenario_df
     )
 
     apply_light_theme(fig3)
@@ -688,7 +852,7 @@ with tab4:
     )
 
 # =========================================================
-# TAB 5 - MODEL COMPARISON
+# TAB 5
 # =========================================================
 
 with tab5:
@@ -700,64 +864,97 @@ with tab5:
             'Moving Average',
             'Random Forest',
             'Gradient Boosting',
-            'ARIMA'
+            'ARIMA',
+            'SARIMA'
         ],
 
         'MAE': [
+
             mean_absolute_error(
                 y_test[1:],
                 naive_forecast.dropna()
             ),
+
             mean_absolute_error(
                 y_test,
-                [moving_avg_forecast] * len(y_test)
+                [moving_avg_forecast]
+                * len(y_test)
             ),
+
             rf_mae,
             gb_mae,
-            arima_mae
+            arima_mae,
+            sarima_mae
         ],
 
         'RMSE': [
-            np.sqrt(mean_squared_error(
-                y_test[1:],
-                naive_forecast.dropna()
-            )),
-            np.sqrt(mean_squared_error(
-                y_test,
-                [moving_avg_forecast] * len(y_test)
-            )),
+
+            np.sqrt(
+                mean_squared_error(
+                    y_test[1:],
+                    naive_forecast.dropna()
+                )
+            ),
+
+            np.sqrt(
+                mean_squared_error(
+                    y_test,
+                    [moving_avg_forecast]
+                    * len(y_test)
+                )
+            ),
+
             rf_rmse,
             gb_rmse,
-            arima_rmse
+            arima_rmse,
+            sarima_rmse
         ]
     })
+
+    comparison['Score'] = (
+        comparison['RMSE']
+        .rank(method='min')
+    )
+
+    comparison = comparison.sort_values(
+        by='Score'
+    )
 
     st.dataframe(
         comparison,
         use_container_width=True
     )
 
+    csv = comparison.to_csv(
+        index=False
+    )
+
+    st.download_button(
+        label="Download Report",
+        data=csv,
+        file_name="forecast_report.csv",
+        mime="text/csv"
+    )
+
 # =========================================================
-# TAB 6 - DISCHARGE FORECAST
+# TAB 6
 # =========================================================
 
 with tab6:
 
-    st.subheader("Discharge Demand Forecast")
+    st.subheader(
+        "Discharge Demand Forecast"
+    )
 
     discharge_df = pd.DataFrame({
 
-        'Actual Discharges': discharge_test.values,
-        'Predicted Discharges': discharge_preds
+        'Actual': discharge_test.values,
+        'Predicted': discharge_preds
 
     }, index=discharge_test.index)
 
     fig_discharge = px.line(
-        discharge_df,
-        color_discrete_sequence=[
-            "#0F766E",
-            "#2563EB"
-        ]
+        discharge_df
     )
 
     apply_light_theme(fig_discharge)
@@ -768,12 +965,14 @@ with tab6:
     )
 
 # =========================================================
-# TAB 7 - NATIONAL OPS
+# TAB 7
 # =========================================================
 
 with tab7:
 
-    st.subheader("National Operations Center")
+    st.subheader(
+        "National Operations Center"
+    )
 
     map_df = pd.DataFrame({
 
@@ -796,12 +995,7 @@ with tab7:
         map_df,
         x='Region',
         y='Stress Level',
-        color='Stress Level',
-        color_continuous_scale=[
-            "#86EFAC",
-            "#FACC15",
-            "#EF4444"
-        ]
+        color='Stress Level'
     )
 
     apply_light_theme(fig5)
@@ -812,12 +1006,22 @@ with tab7:
     )
 
 # =========================================================
-# TAB 8 - DECOMPOSITION
+# TAB 8
 # =========================================================
 
 with tab8:
 
-    st.subheader("Time Series Decomposition")
+    st.subheader(
+        "Time Series Decomposition"
+    )
+
+    st.info("""
+    Trend = Long-term movement
+
+    Seasonality = Weekly repeating patterns
+
+    Residuals = Unexpected anomalies
+    """)
 
     decomposition = seasonal_decompose(
         df['Children in HHS Care'],
@@ -860,12 +1064,14 @@ with tab8:
     )
 
 # =========================================================
-# TAB 9 - SURGE SIMULATION
+# TAB 9
 # =========================================================
 
 with tab9:
 
-    st.subheader("Emergency Surge Simulation")
+    st.subheader(
+        "Emergency Surge Simulation"
+    )
 
     intake_increase = st.slider(
         "Increase Intake %",
@@ -898,7 +1104,7 @@ with tab9:
     )
 
 # =========================================================
-# TAB 10 - EXECUTIVE SUMMARY
+# TAB 10
 # =========================================================
 
 with tab10:
@@ -910,41 +1116,83 @@ with tab10:
 
     <h4>Operational Summary</h4>
 
-    Forecasting models indicate moderate operational stress across the
-    UAC care system over the next forecasting horizon.
-
-    Gradient Boosting achieved the highest predictive reliability,
-    outperforming ARIMA and baseline forecasting approaches.
+    Gradient Boosting achieved the strongest
+    predictive performance across operational
+    forecasting tasks.
 
     <br>
 
-    <b>Forecast Accuracy:</b> {forecast_accuracy:.2f}%<br>
-    <b>Capacity Risk:</b> {capacity_risk:.2f}%<br>
-    <b>Forecast Stability:</b> {stability_score}%<br>
-    <b>Surge Lead Time:</b> {surge_lead_time} Days
+    <b>Forecast Accuracy:</b>
+    {forecast_accuracy:.2f}%<br>
 
-    <br><br>
+    <b>Capacity Risk:</b>
+    {capacity_risk:.2f}%<br>
 
-    <h4>Key Operational Risks</h4>
+    <b>Forecast Stability:</b>
+    {stability_score}%<br>
 
-    <ul>
-    <li>Transfer-discharge imbalance</li>
-    <li>Potential shelter utilization increases</li>
-    <li>Elevated staffing requirements</li>
-    <li>Regional processing bottlenecks</li>
-    </ul>
+    <b>Surge Lead Time:</b>
+    {surge_lead_time} Days<br>
 
-    <h4>Recommended Actions</h4>
+    <b>7-Day Forecast Error:</b>
+    {short_mae:.2f}<br>
 
-    <ul>
-    <li>Increase staffing readiness</li>
-    <li>Expand discharge coordination capacity</li>
-    <li>Monitor transfer surges daily</li>
-    <li>Prepare emergency shelter infrastructure</li>
-    </ul>
+    <b>30-Day Forecast Error:</b>
+    {medium_mae:.2f}<br>
+
+    <b>Projected Capacity Breach Days:</b>
+    {len(breach_days)}
 
     </div>
     """, unsafe_allow_html=True)
+
+# =========================================================
+# TAB 11
+# =========================================================
+
+with tab11:
+
+    st.subheader(
+        "Future Multi-Day Forecast"
+    )
+
+    fig_future = px.line(
+        future_df,
+        x='Date',
+        y='Forecast'
+    )
+
+    apply_light_theme(fig_future)
+
+    st.plotly_chart(
+        fig_future,
+        use_container_width=True
+    )
+
+# =========================================================
+# TAB 12
+# =========================================================
+
+with tab12:
+
+    st.subheader(
+        "Feature Importance Analysis"
+    )
+
+    fig_importance = px.bar(
+        importance_df,
+        x='Importance',
+        y='Feature',
+        orientation='h',
+        color='Importance'
+    )
+
+    apply_light_theme(fig_importance)
+
+    st.plotly_chart(
+        fig_importance,
+        use_container_width=True
+    )
 
 # =========================================================
 # FOOTER
