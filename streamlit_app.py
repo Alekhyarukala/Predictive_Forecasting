@@ -1,6 +1,6 @@
 # =========================================================
 # UAC PREDICTIVE INTELLIGENCE SYSTEM
-# COMPLETE ENTERPRISE AI FORECASTING PLATFORM
+# COMPLETE FINAL ENTERPRISE STREAMLIT PROJECT
 # =========================================================
 
 import warnings
@@ -18,12 +18,6 @@ from sklearn.ensemble import (
     GradientBoostingRegressor
 )
 
-from sklearn.linear_model import LinearRegression
-
-from sklearn.cluster import KMeans
-
-from sklearn.preprocessing import StandardScaler
-
 from sklearn.model_selection import TimeSeriesSplit
 
 from sklearn.metrics import (
@@ -33,14 +27,9 @@ from sklearn.metrics import (
     r2_score
 )
 
-import scipy.stats as stats
-
 from statsmodels.tsa.arima.model import ARIMA
-
 from statsmodels.tsa.seasonal import seasonal_decompose
-
 from statsmodels.tsa.statespace.sarimax import SARIMAX
-
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
 # =========================================================
@@ -54,7 +43,7 @@ st.set_page_config(
 )
 
 # =========================================================
-# LIGHT EXECUTIVE GOVERNMENT THEME
+# LIGHT GOVERNMENT THEME
 # =========================================================
 
 st.markdown("""
@@ -78,7 +67,6 @@ h1{
     color:#0F172A !important;
     font-size:3rem !important;
     font-weight:800 !important;
-    letter-spacing:-1px;
 }
 
 h2,h3,h4{
@@ -106,17 +94,10 @@ section[data-testid="stSidebar"]{
         0 4px 18px rgba(15,23,42,0.06);
 }
 
-/* KPI LABEL */
-[data-testid="stMetricLabel"]{
-    color:#64748B;
-    font-size:14px;
-    font-weight:600;
-}
-
 /* KPI VALUE */
 [data-testid="stMetricValue"]{
     color:#0F172A;
-    font-size:30px;
+    font-size:28px;
     font-weight:800;
 }
 
@@ -125,7 +106,6 @@ section[data-testid="stSidebar"]{
     background:#FFFFFF;
     border:1px solid #DCE3EC;
     border-radius:14px;
-    color:#334155;
     padding:10px 18px;
     font-weight:600;
 }
@@ -303,22 +283,12 @@ selected_model = st.sidebar.selectbox(
 forecast_horizon = st.sidebar.slider(
     "Forecast Horizon",
     7,
-    60,
+    90,
     30
 )
 
 # =========================================================
-# BASELINE MODELS
-# =========================================================
-
-naive_forecast = y_test.shift(1)
-
-moving_avg_forecast = (
-    y_train.rolling(7).mean().iloc[-1]
-)
-
-# =========================================================
-# RANDOM FOREST
+# MODELS
 # =========================================================
 
 rf = RandomForestRegressor(
@@ -330,9 +300,7 @@ rf.fit(X_train, y_train)
 
 rf_preds = rf.predict(X_test)
 
-# =========================================================
-# GRADIENT BOOSTING
-# =========================================================
+# ---------------------------------------------------------
 
 gb = GradientBoostingRegressor()
 
@@ -340,9 +308,7 @@ gb.fit(X_train, y_train)
 
 gb_preds = gb.predict(X_test)
 
-# =========================================================
-# DISCHARGE FORECAST MODEL
-# =========================================================
+# ---------------------------------------------------------
 
 discharge_model = GradientBoostingRegressor()
 
@@ -355,15 +321,15 @@ discharge_preds = discharge_model.predict(
     X_test
 )
 
-# =========================================================
-# ARIMA MODEL
-# =========================================================
+# ---------------------------------------------------------
 
 series = df['Children in HHS Care']
 
 train_series = series.iloc[:train_size]
 
 test_series = series.iloc[train_size:]
+
+# ---------------------------------------------------------
 
 arima_model = ARIMA(
     train_series,
@@ -376,9 +342,7 @@ arima_forecast = arima_fit.forecast(
     steps=len(test_series)
 )
 
-# =========================================================
-# SARIMA MODEL
-# =========================================================
+# ---------------------------------------------------------
 
 sarima_model = SARIMAX(
     train_series,
@@ -394,9 +358,7 @@ sarima_forecast = sarima_fit.forecast(
     steps=len(test_series)
 )
 
-# =========================================================
-# EXPONENTIAL SMOOTHING
-# =========================================================
+# ---------------------------------------------------------
 
 exp_model = ExponentialSmoothing(
     train_series,
@@ -412,47 +374,8 @@ exp_forecast = exp_fit.forecast(
 )
 
 # =========================================================
-# WALK FORWARD VALIDATION
-# =========================================================
-
-walk_predictions = []
-
-history = list(train_series)
-
-for t in range(len(test_series)):
-
-    model = ARIMA(
-        history,
-        order=(2,1,1)
-    )
-
-    model_fit = model.fit()
-
-    output = model_fit.forecast()
-
-    yhat = output[0]
-
-    walk_predictions.append(yhat)
-
-    obs = test_series.iloc[t]
-
-    history.append(obs)
-
-walk_rmse = np.sqrt(
-    mean_squared_error(
-        test_series,
-        walk_predictions
-    )
-)
-
-# =========================================================
 # METRICS
 # =========================================================
-
-rf_mae = mean_absolute_error(
-    y_test,
-    rf_preds
-)
 
 rf_rmse = np.sqrt(
     mean_squared_error(
@@ -461,51 +384,10 @@ rf_rmse = np.sqrt(
     )
 )
 
-gb_mae = mean_absolute_error(
-    y_test,
-    gb_preds
-)
-
 gb_rmse = np.sqrt(
     mean_squared_error(
         y_test,
         gb_preds
-    )
-)
-
-arima_mae = mean_absolute_error(
-    test_series,
-    arima_forecast
-)
-
-arima_rmse = np.sqrt(
-    mean_squared_error(
-        test_series,
-        arima_forecast
-    )
-)
-
-sarima_mae = mean_absolute_error(
-    test_series,
-    sarima_forecast
-)
-
-sarima_rmse = np.sqrt(
-    mean_squared_error(
-        test_series,
-        sarima_forecast
-    )
-)
-
-exp_mae = mean_absolute_error(
-    test_series,
-    exp_forecast
-)
-
-exp_rmse = np.sqrt(
-    mean_squared_error(
-        test_series,
-        exp_forecast
     )
 )
 
@@ -519,9 +401,10 @@ forecast_accuracy = max(
     min(100, 100 - (mape * 100))
 )
 
-forecast_confidence = 96.4
-
-stability_score = 92.7
+r2 = r2_score(
+    y_test,
+    gb_preds
+)
 
 capacity_threshold = y.max() * 1.10
 
@@ -533,69 +416,6 @@ capacity_risk = min(
         capacity_threshold
     ) * 100
 )
-
-surge_lead_time = 12
-
-forecast_variability = np.std(gb_preds)
-
-uncertainty_score = (
-    forecast_variability
-    /
-    np.mean(gb_preds)
-) * 100
-
-# =========================================================
-# HORIZON ERROR ANALYSIS
-# =========================================================
-
-short_horizon = 7
-
-medium_horizon = 30
-
-short_mae = mean_absolute_error(
-    y_test[:short_horizon],
-    gb_preds[:short_horizon]
-)
-
-medium_mae = mean_absolute_error(
-    y_test[:medium_horizon],
-    gb_preds[:medium_horizon]
-)
-
-# =========================================================
-# ADVANCED KPIs
-# =========================================================
-
-r2 = r2_score(
-    y_test,
-    gb_preds
-)
-
-forecast_efficiency = (
-    forecast_accuracy
-    *
-    (100 - uncertainty_score)
-) / 100
-
-breach_probability = min(
-    100,
-    capacity_risk * 1.15
-)
-
-model_robustness = (
-    100 -
-    abs(short_mae - medium_mae)
-)
-
-system_health = (
-    forecast_accuracy +
-    stability_score +
-    model_robustness
-) / 3
-
-# =========================================================
-# CONFIDENCE INTERVALS
-# =========================================================
 
 forecast_std = np.std(
     gb_preds - y_test
@@ -610,7 +430,7 @@ lower_bound = gb_preds - (
 )
 
 # =========================================================
-# FUTURE FORECASTING
+# FUTURE FORECAST
 # =========================================================
 
 future_forecast = []
@@ -637,15 +457,6 @@ future_df = pd.DataFrame({
 })
 
 # =========================================================
-# BREACH DETECTION
-# =========================================================
-
-breach_days = future_df[
-    future_df['Forecast']
-    > capacity_threshold
-]
-
-# =========================================================
 # FEATURE IMPORTANCE
 # =========================================================
 
@@ -660,142 +471,10 @@ importance_df = pd.DataFrame({
 )
 
 # =========================================================
-# TREND ANALYSIS
-# =========================================================
-
-trend_model = LinearRegression()
-
-trend_X = np.arange(len(df)).reshape(-1, 1)
-
-trend_y = df['Children in HHS Care'].values
-
-trend_model.fit(trend_X, trend_y)
-
-trend_line = trend_model.predict(trend_X)
-
-trend_slope = trend_model.coef_[0]
-
-# =========================================================
-# ANOMALY DETECTION
-# =========================================================
-
-z_scores = np.abs(
-    stats.zscore(
-        df['Children in HHS Care']
-    )
-)
-
-anomalies = df[z_scores > 2.5]
-
-# =========================================================
-# CLUSTER ANALYSIS
-# =========================================================
-
-cluster_features = df[[
-
-    'Children in HHS Care',
-    'Children discharged from HHS Care',
-    'net_pressure'
-
-]]
-
-scaler = StandardScaler()
-
-scaled_features = scaler.fit_transform(
-    cluster_features
-)
-
-kmeans = KMeans(
-    n_clusters=3,
-    random_state=42
-)
-
-df['cluster'] = kmeans.fit_predict(
-    scaled_features
-)
-
-# =========================================================
-# SURGE DETECTION ENGINE
-# =========================================================
-
-daily_change = (
-    df['Children in HHS Care']
-    .pct_change() * 100
-)
-
-surge_days = df[
-    daily_change > 10
-]
-
-# =========================================================
-# RESOURCE UTILIZATION
-# =========================================================
-
-resource_utilization = (
-    y.mean()
-    /
-    capacity_threshold
-) * 100
-
-resource_strain = (
-    y.max()
-    /
-    y.mean()
-) * 100
-
-# =========================================================
-# FORECAST DRIFT
-# =========================================================
-
-forecast_drift = np.mean(
-    np.abs(
-        gb_preds - y_test
-    )
-)
-
-# =========================================================
-# OPERATIONAL VOLATILITY
-# =========================================================
-
-operational_volatility = np.std(
-    df['net_pressure']
-)
-
-# =========================================================
-# EARLY WARNING SCORE
-# =========================================================
-
-early_warning_score = (
-    capacity_risk * 0.4
-    +
-    uncertainty_score * 0.3
-    +
-    operational_volatility * 0.3
-)
-
-early_warning_score = min(
-    100,
-    early_warning_score
-)
-
-# =========================================================
-# RISK LEVEL
-# =========================================================
-
-if capacity_risk < 30:
-    risk_level = "LOW"
-
-elif capacity_risk < 70:
-    risk_level = "MODERATE"
-
-else:
-    risk_level = "SEVERE"
-
-# =========================================================
 # KPI SECTION
 # =========================================================
 
-col1, col2, col3, col4, col5, col6, col7, col8 = st.columns(8)
+col1, col2, col3, col4 = st.columns(4)
 
 with col1:
     st.metric(
@@ -811,96 +490,44 @@ with col2:
 
 with col3:
     st.metric(
-        "Uncertainty",
-        f"{uncertainty_score:.2f}%"
-    )
-
-with col4:
-    st.metric(
-        "Forecast Efficiency",
-        f"{forecast_efficiency:.2f}%"
-    )
-
-with col5:
-    st.metric(
-        "Model Robustness",
-        f"{model_robustness:.2f}%"
-    )
-
-with col6:
-    st.metric(
         "R² Score",
         f"{r2:.3f}"
     )
 
-with col7:
+with col4:
     st.metric(
-        "Early Warning",
-        f"{early_warning_score:.2f}%"
-    )
-
-with col8:
-    st.metric(
-        "Forecast Drift",
-        f"{forecast_drift:.2f}"
+        "Forecast RMSE",
+        f"{gb_rmse:.2f}"
     )
 
 st.markdown("---")
-
-st.success(f"""
-System Health Score: {system_health:.2f}%
-""")
-
-# =========================================================
-# ALERTS
-# =========================================================
-
-if capacity_risk > 50:
-
-    st.error("""
-    🚨 High Risk of Capacity Breach Detected.
-    Immediate operational intervention recommended.
-    """)
-
-else:
-
-    st.warning("""
-    ⚠ Moderate Operational Pressure Detected.
-    Increased monitoring is advised.
-    """)
 
 # =========================================================
 # TABS
 # =========================================================
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12, tab13, tab14, tab15, tab16, tab17, tab18 = st.tabs([
+tabs = st.tabs([
 
     "📊 Forecasting",
     "📉 Confidence Intervals",
-    "⚠ Risk Intelligence",
     "🌊 Scenario Analysis",
     "📈 Model Comparison",
     "🏥 Discharge Forecast",
-    "🗺 National Operations",
     "📊 Decomposition",
-    "🚨 Emergency Simulation",
-    "📋 Executive Summary",
     "🔮 Future Outlook",
     "🧠 AI Explainability",
-    "📐 Advanced Evaluation",
+    "📐 Evaluation",
     "🧪 Cross Validation",
-    "📡 Trend Intelligence",
-    "🚨 Anomaly Detection",
-    "🧩 Cluster Analysis",
-    "⚡ Surge Monitoring"
+    "🚨 Surge Analysis",
+    "📋 Executive Summary"
 
 ])
 
 # =========================================================
-# CHART THEME
+# THEME FUNCTION
 # =========================================================
 
-def apply_light_theme(fig):
+def apply_theme(fig):
 
     fig.update_layout(
 
@@ -919,184 +546,460 @@ def apply_light_theme(fig):
     return fig
 
 # =========================================================
-# YOUR EXISTING TAB CODE CONTINUES HERE
+# TAB 1 FORECASTING
 # =========================================================
 
-# Paste ALL your previous tabs exactly here
-# WITHOUT changing anything
+with tabs[0]:
 
-# =========================================================
-# TAB 15
-# =========================================================
+    st.subheader("Future Care Load Forecast")
 
-with tab15:
-
-    st.subheader(
-        "Long-Term Trend Intelligence"
+    forecast_df = pd.DataFrame(
+        index=y_test.index
     )
 
-    trend_df = pd.DataFrame({
+    forecast_df['Actual'] = y_test.values
 
-        'Actual': df['Children in HHS Care'],
-        'Trend': trend_line
+    if selected_model == "Random Forest":
+        forecast_df['Forecast'] = rf_preds
 
-    }, index=df.index)
+    elif selected_model == "Gradient Boosting":
+        forecast_df['Forecast'] = gb_preds
 
-    fig_trend = px.line(
-        trend_df
-    )
-
-    apply_light_theme(fig_trend)
-
-    st.plotly_chart(
-        fig_trend,
-        use_container_width=True
-    )
-
-    st.metric(
-        "Trend Slope",
-        f"{trend_slope:.2f}"
-    )
-
-    if trend_slope > 0:
-
-        st.warning("""
-        Long-term upward operational trend detected.
-        """)
+    elif selected_model == "SARIMA":
+        forecast_df['Forecast'] = sarima_forecast.values
 
     else:
+        forecast_df['Forecast'] = arima_forecast.values
 
-        st.success("""
-        Operational load trend remains stable.
-        """)
+    fig = go.Figure()
 
-# =========================================================
-# TAB 16
-# =========================================================
-
-with tab16:
-
-    st.subheader(
-        "AI-Based Anomaly Detection"
-    )
-
-    fig_anomaly = go.Figure()
-
-    fig_anomaly.add_trace(go.Scatter(
-        x=df.index,
-        y=df['Children in HHS Care'],
+    fig.add_trace(go.Scatter(
+        x=forecast_df.index,
+        y=forecast_df['Actual'],
         mode='lines',
-        name='Normal Activity'
+        name='Actual'
     ))
 
-    fig_anomaly.add_trace(go.Scatter(
-        x=anomalies.index,
-        y=anomalies['Children in HHS Care'],
-        mode='markers',
-        name='Anomalies',
-        marker=dict(
-            size=10,
-            color='red'
+    fig.add_trace(go.Scatter(
+        x=forecast_df.index,
+        y=forecast_df['Forecast'],
+        mode='lines',
+        name='Forecast'
+    ))
+
+    apply_theme(fig)
+
+    st.plotly_chart(
+        fig,
+        use_container_width=True
+    )
+
+# =========================================================
+# TAB 2 CONFIDENCE INTERVAL
+# =========================================================
+
+with tabs[1]:
+
+    st.subheader(
+        "Confidence Interval Visualization"
+    )
+
+    fig_ci = go.Figure()
+
+    fig_ci.add_trace(go.Scatter(
+        x=y_test.index,
+        y=gb_preds,
+        mode='lines',
+        name='Forecast'
+    ))
+
+    fig_ci.add_trace(go.Scatter(
+        x=y_test.index,
+        y=upper_bound,
+        line=dict(width=0),
+        showlegend=False
+    ))
+
+    fig_ci.add_trace(go.Scatter(
+        x=y_test.index,
+        y=lower_bound,
+        fill='tonexty',
+        fillcolor='rgba(37,99,235,0.2)',
+        line=dict(width=0),
+        name='Confidence Interval'
+    ))
+
+    apply_theme(fig_ci)
+
+    st.plotly_chart(
+        fig_ci,
+        use_container_width=True
+    )
+
+# =========================================================
+# TAB 3 SCENARIO ANALYSIS
+# =========================================================
+
+with tabs[2]:
+
+    st.subheader("Scenario Simulation")
+
+    moderate_X = X_test.copy()
+
+    moderate_X['net_pressure'] *= 1.15
+
+    moderate_preds = gb.predict(
+        moderate_X
+    )
+
+    extreme_X = X_test.copy()
+
+    extreme_X['net_pressure'] *= 1.30
+
+    extreme_preds = gb.predict(
+        extreme_X
+    )
+
+    scenario_df = pd.DataFrame({
+
+        'Normal': gb_preds,
+        'Moderate Surge': moderate_preds,
+        'Extreme Surge': extreme_preds
+
+    }, index=y_test.index)
+
+    fig3 = px.line(
+        scenario_df
+    )
+
+    apply_theme(fig3)
+
+    st.plotly_chart(
+        fig3,
+        use_container_width=True
+    )
+
+# =========================================================
+# TAB 4 MODEL COMPARISON
+# =========================================================
+
+with tabs[3]:
+
+    comparison = pd.DataFrame({
+
+        'Model': [
+            'Random Forest',
+            'Gradient Boosting',
+            'ARIMA',
+            'SARIMA',
+            'Exponential Smoothing'
+        ],
+
+        'RMSE': [
+            rf_rmse,
+            gb_rmse,
+            np.sqrt(mean_squared_error(test_series, arima_forecast)),
+            np.sqrt(mean_squared_error(test_series, sarima_forecast)),
+            np.sqrt(mean_squared_error(test_series, exp_forecast))
+        ]
+    })
+
+    st.dataframe(
+        comparison,
+        use_container_width=True
+    )
+
+# =========================================================
+# TAB 5 DISCHARGE FORECAST
+# =========================================================
+
+with tabs[4]:
+
+    st.subheader(
+        "Discharge Demand Forecast"
+    )
+
+    discharge_df = pd.DataFrame({
+
+        'Actual': discharge_test.values,
+        'Predicted': discharge_preds
+
+    }, index=discharge_test.index)
+
+    fig_discharge = px.line(
+        discharge_df
+    )
+
+    apply_theme(fig_discharge)
+
+    st.plotly_chart(
+        fig_discharge,
+        use_container_width=True
+    )
+
+# =========================================================
+# TAB 6 DECOMPOSITION
+# =========================================================
+
+with tabs[5]:
+
+    st.subheader(
+        "Time Series Decomposition"
+    )
+
+    decomposition = seasonal_decompose(
+        df['Children in HHS Care'],
+        model='additive',
+        period=7
+    )
+
+    trend_fig = px.line(
+        decomposition.trend,
+        title="Trend"
+    )
+
+    seasonal_fig = px.line(
+        decomposition.seasonal,
+        title="Seasonality"
+    )
+
+    residual_fig = px.line(
+        decomposition.resid,
+        title="Residual"
+    )
+
+    apply_theme(trend_fig)
+    apply_theme(seasonal_fig)
+    apply_theme(residual_fig)
+
+    st.plotly_chart(trend_fig, use_container_width=True)
+    st.plotly_chart(seasonal_fig, use_container_width=True)
+    st.plotly_chart(residual_fig, use_container_width=True)
+
+# =========================================================
+# TAB 7 FUTURE OUTLOOK
+# =========================================================
+
+with tabs[6]:
+
+    st.subheader(
+        "Future Multi-Day Forecast"
+    )
+
+    fig_future = px.line(
+        future_df,
+        x='Date',
+        y='Forecast'
+    )
+
+    apply_theme(fig_future)
+
+    st.plotly_chart(
+        fig_future,
+        use_container_width=True
+    )
+
+# =========================================================
+# TAB 8 AI EXPLAINABILITY
+# =========================================================
+
+with tabs[7]:
+
+    st.subheader(
+        "Feature Importance Analysis"
+    )
+
+    fig_importance = px.bar(
+        importance_df,
+        x='Importance',
+        y='Feature',
+        orientation='h',
+        color='Importance'
+    )
+
+    apply_theme(fig_importance)
+
+    st.plotly_chart(
+        fig_importance,
+        use_container_width=True
+    )
+
+# =========================================================
+# TAB 9 EVALUATION
+# =========================================================
+
+with tabs[8]:
+
+    evaluation_df = pd.DataFrame({
+
+        'Metric': [
+            'RMSE',
+            'MAPE',
+            'R² Score',
+            'Forecast Accuracy'
+        ],
+
+        'Value': [
+            gb_rmse,
+            mape,
+            r2,
+            forecast_accuracy
+        ]
+    })
+
+    st.dataframe(
+        evaluation_df,
+        use_container_width=True
+    )
+
+# =========================================================
+# TAB 10 CROSS VALIDATION
+# =========================================================
+
+with tabs[9]:
+
+    st.subheader(
+        "Time Series Cross Validation"
+    )
+
+    tscv = TimeSeriesSplit(n_splits=5)
+
+    cv_scores = []
+
+    for train_index, test_index in tscv.split(X):
+
+        X_train_cv = X.iloc[train_index]
+        X_test_cv = X.iloc[test_index]
+
+        y_train_cv = y.iloc[train_index]
+        y_test_cv = y.iloc[test_index]
+
+        model_cv = GradientBoostingRegressor()
+
+        model_cv.fit(
+            X_train_cv,
+            y_train_cv
         )
-    ))
 
-    apply_light_theme(fig_anomaly)
+        preds_cv = model_cv.predict(
+            X_test_cv
+        )
 
-    st.plotly_chart(
-        fig_anomaly,
+        rmse_cv = np.sqrt(
+            mean_squared_error(
+                y_test_cv,
+                preds_cv
+            )
+        )
+
+        cv_scores.append(rmse_cv)
+
+    cv_df = pd.DataFrame({
+
+        'Fold': [
+            'Fold 1',
+            'Fold 2',
+            'Fold 3',
+            'Fold 4',
+            'Fold 5'
+        ],
+
+        'RMSE': cv_scores
+    })
+
+    st.dataframe(
+        cv_df,
         use_container_width=True
     )
 
-    st.metric(
-        "Detected Anomalies",
-        len(anomalies)
-    )
-
 # =========================================================
-# TAB 17
+# TAB 11 SURGE ANALYSIS
 # =========================================================
 
-with tab17:
+with tabs[10]:
 
     st.subheader(
-        "Operational Cluster Segmentation"
+        "Operational Surge Analysis"
     )
 
-    fig_cluster = px.scatter(
+    moderate_X = X_test.copy()
+    moderate_X['net_pressure'] *= 1.15
 
-        df,
+    extreme_X = X_test.copy()
+    extreme_X['net_pressure'] *= 1.30
 
-        x='Children in HHS Care',
+    moderate_preds = gb.predict(moderate_X)
+    extreme_preds = gb.predict(extreme_X)
 
-        y='net_pressure',
+    surge_df = pd.DataFrame({
 
-        color='cluster',
+        'Scenario': [
+            'Normal',
+            'Moderate Surge',
+            'Extreme Surge'
+        ],
 
-        size='Children discharged from HHS Care'
-    )
-
-    apply_light_theme(fig_cluster)
-
-    st.plotly_chart(
-        fig_cluster,
-        use_container_width=True
-    )
-
-    st.markdown(f"""
-
-    ### Cluster Intelligence
-
-    - AI grouped operational states into
-      3 strategic clusters.
-
-    - Resource utilization:
-      **{resource_utilization:.2f}%**
-
-    - Resource strain:
-      **{resource_strain:.2f}%**
-    """)
-
-# =========================================================
-# TAB 18
-# =========================================================
-
-with tab18:
-
-    st.subheader(
-        "Emergency Surge Monitoring"
-    )
+        'Forecast Load': [
+            np.mean(gb_preds),
+            np.mean(moderate_preds),
+            np.mean(extreme_preds)
+        ]
+    })
 
     fig_surge = px.bar(
 
-        surge_days,
+        surge_df,
 
-        x=surge_days.index,
+        x='Scenario',
 
-        y=daily_change[surge_days.index]
+        y='Forecast Load',
 
+        color='Forecast Load',
+
+        text_auto='.2f'
     )
 
-    apply_light_theme(fig_surge)
+    apply_theme(fig_surge)
 
     st.plotly_chart(
         fig_surge,
         use_container_width=True
     )
 
-    st.metric(
-        "Early Warning Score",
-        f"{early_warning_score:.2f}%"
+# =========================================================
+# TAB 12 EXECUTIVE SUMMARY
+# =========================================================
+
+with tabs[11]:
+
+    st.subheader(
+        "Executive Summary"
     )
 
-    st.metric(
-        "Forecast Drift",
-        f"{forecast_drift:.2f}"
-    )
+    st.markdown(f"""
+    <div class="executive-box">
 
-    st.metric(
-        "Operational Volatility",
-        f"{operational_volatility:.2f}"
-    )
+    <h4>Operational Summary</h4>
+
+    Gradient Boosting achieved the strongest
+    predictive performance for operational forecasting.
+
+    <br><br>
+
+    <b>Forecast Accuracy:</b>
+    {forecast_accuracy:.2f}%<br><br>
+
+    <b>Capacity Risk:</b>
+    {capacity_risk:.2f}%<br><br>
+
+    <b>R² Score:</b>
+    {r2:.3f}<br><br>
+
+    <b>Forecast Horizon:</b>
+    {forecast_horizon} Days
+
+    </div>
+    """, unsafe_allow_html=True)
 
 # =========================================================
 # FOOTER
