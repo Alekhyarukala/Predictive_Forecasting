@@ -14,15 +14,19 @@ from sklearn.ensemble import (
     GradientBoostingRegressor
 )
 
+from sklearn.model_selection import TimeSeriesSplit
+
 from sklearn.metrics import (
     mean_absolute_error,
     mean_squared_error,
-    mean_absolute_percentage_error
+    mean_absolute_percentage_error,
+    r2_score
 )
 
 from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.seasonal import seasonal_decompose
 from statsmodels.tsa.statespace.sarimax import SARIMAX
+from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
 # =========================================================
 # PAGE CONFIG
@@ -376,6 +380,23 @@ sarima_forecast = sarima_fit.forecast(
 )
 
 # =========================================================
+# EXPONENTIAL SMOOTHING
+# =========================================================
+
+exp_model = ExponentialSmoothing(
+    train_series,
+    trend='add',
+    seasonal='add',
+    seasonal_periods=7
+)
+
+exp_fit = exp_model.fit()
+
+exp_forecast = exp_fit.forecast(
+    len(test_series)
+)
+
+# =========================================================
 # WALK FORWARD VALIDATION
 # =========================================================
 
@@ -401,6 +422,13 @@ for t in range(len(test_series)):
     obs = test_series.iloc[t]
 
     history.append(obs)
+
+walk_rmse = np.sqrt(
+    mean_squared_error(
+        test_series,
+        walk_predictions
+    )
+)
 
 # =========================================================
 # METRICS
@@ -451,6 +479,18 @@ sarima_rmse = np.sqrt(
     mean_squared_error(
         test_series,
         sarima_forecast
+    )
+)
+
+exp_mae = mean_absolute_error(
+    test_series,
+    exp_forecast
+)
+
+exp_rmse = np.sqrt(
+    mean_squared_error(
+        test_series,
+        exp_forecast
     )
 )
 
@@ -506,6 +546,37 @@ medium_mae = mean_absolute_error(
     y_test[:medium_horizon],
     gb_preds[:medium_horizon]
 )
+
+# =========================================================
+# ADVANCED KPIs
+# =========================================================
+
+r2 = r2_score(
+    y_test,
+    gb_preds
+)
+
+forecast_efficiency = (
+    forecast_accuracy
+    *
+    (100 - uncertainty_score)
+) / 100
+
+breach_probability = min(
+    100,
+    capacity_risk * 1.15
+)
+
+model_robustness = (
+    100 -
+    abs(short_mae - medium_mae)
+)
+
+system_health = (
+    forecast_accuracy +
+    stability_score +
+    model_robustness
+) / 3
 
 # =========================================================
 # CONFIDENCE INTERVALS
@@ -590,7 +661,7 @@ else:
 # KPI SECTION
 # =========================================================
 
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5, col6 = st.columns(6)
 
 with col1:
     st.metric(
@@ -612,9 +683,27 @@ with col3:
 
 with col4:
     st.metric(
-        "Risk Level",
-        risk_level
+        "Forecast Efficiency",
+        f"{forecast_efficiency:.2f}%"
     )
+
+with col5:
+    st.metric(
+        "Model Robustness",
+        f"{model_robustness:.2f}%"
+    )
+
+with col6:
+    st.metric(
+        "R² Score",
+        f"{r2:.3f}"
+    )
+
+st.markdown("---")
+
+st.success(f"""
+System Health Score: {system_health:.2f}%
+""")
 
 # =========================================================
 # ALERTS
@@ -638,7 +727,7 @@ else:
 # TABS
 # =========================================================
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12, tab13, tab14 = st.tabs([
 
     "📊 Forecasting",
     "📉 Confidence Intervals",
@@ -651,7 +740,9 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10, tab11, tab12 = st.t
     "🚨 Emergency Simulation",
     "📋 Executive Summary",
     "🔮 Future Outlook",
-    "🧠 AI Explainability"
+    "🧠 AI Explainability",
+    "📐 Advanced Evaluation",
+    "🧪 Cross Validation"
 
 ])
 
@@ -683,7 +774,9 @@ def apply_light_theme(fig):
 
 with tab1:
 
-    st.subheader("Future Care Load Forecast")
+    st.subheader(
+        "Future Care Load Forecast"
+    )
 
     forecast_df = pd.DataFrame(
         index=y_test.index
@@ -865,7 +958,8 @@ with tab5:
             'Random Forest',
             'Gradient Boosting',
             'ARIMA',
-            'SARIMA'
+            'SARIMA',
+            'Exponential Smoothing'
         ],
 
         'MAE': [
@@ -884,7 +978,8 @@ with tab5:
             rf_mae,
             gb_mae,
             arima_mae,
-            sarima_mae
+            sarima_mae,
+            exp_mae
         ],
 
         'RMSE': [
@@ -907,7 +1002,8 @@ with tab5:
             rf_rmse,
             gb_rmse,
             arima_rmse,
-            sarima_rmse
+            sarima_rmse,
+            exp_rmse
         ]
     })
 
@@ -923,17 +1019,6 @@ with tab5:
     st.dataframe(
         comparison,
         use_container_width=True
-    )
-
-    csv = comparison.to_csv(
-        index=False
-    )
-
-    st.download_button(
-        label="Download Report",
-        data=csv,
-        file_name="forecast_report.csv",
-        mime="text/csv"
     )
 
 # =========================================================
@@ -1015,14 +1100,6 @@ with tab8:
         "Time Series Decomposition"
     )
 
-    st.info("""
-    Trend = Long-term movement
-
-    Seasonality = Weekly repeating patterns
-
-    Residuals = Unexpected anomalies
-    """)
-
     decomposition = seasonal_decompose(
         df['Children in HHS Care'],
         model='additive',
@@ -1098,11 +1175,6 @@ with tab9:
         f"{simulated_risk:.1f}%"
     )
 
-    st.metric(
-        "Surge Lead Time",
-        f"{surge_lead_time} Days"
-    )
-
 # =========================================================
 # TAB 10
 # =========================================================
@@ -1134,12 +1206,6 @@ with tab10:
     <b>Surge Lead Time:</b>
     {surge_lead_time} Days<br>
 
-    <b>7-Day Forecast Error:</b>
-    {short_mae:.2f}<br>
-
-    <b>30-Day Forecast Error:</b>
-    {medium_mae:.2f}<br>
-
     <b>Projected Capacity Breach Days:</b>
     {len(breach_days)}
 
@@ -1169,6 +1235,24 @@ with tab11:
         use_container_width=True
     )
 
+    if len(breach_days) > 0:
+
+        st.error(f"""
+        Predicted capacity breach detected on
+        {len(breach_days)} future days.
+        """)
+
+        st.dataframe(
+            breach_days,
+            use_container_width=True
+        )
+
+    else:
+
+        st.success("""
+        No projected capacity breach detected.
+        """)
+
 # =========================================================
 # TAB 12
 # =========================================================
@@ -1191,6 +1275,122 @@ with tab12:
 
     st.plotly_chart(
         fig_importance,
+        use_container_width=True
+    )
+
+    st.markdown(f"""
+    ### AI Operational Insights
+
+    - Most influential feature:
+      **{importance_df.iloc[0]['Feature']}**
+
+    - Forecast efficiency:
+      **{forecast_efficiency:.2f}%**
+
+    - Capacity breach probability:
+      **{breach_probability:.2f}%**
+
+    - System health score:
+      **{system_health:.2f}%**
+    """)
+
+# =========================================================
+# TAB 13
+# =========================================================
+
+with tab13:
+
+    st.subheader(
+        "Advanced Forecast Evaluation"
+    )
+
+    evaluation_df = pd.DataFrame({
+
+        'Metric': [
+            'MAE',
+            'RMSE',
+            'MAPE',
+            'R² Score',
+            'Forecast Efficiency',
+            'Forecast Stability',
+            'Breach Probability',
+            'Walk Forward RMSE'
+        ],
+
+        'Value': [
+            gb_mae,
+            gb_rmse,
+            mape,
+            r2,
+            forecast_efficiency,
+            stability_score,
+            breach_probability,
+            walk_rmse
+        ]
+    })
+
+    st.dataframe(
+        evaluation_df,
+        use_container_width=True
+    )
+
+# =========================================================
+# TAB 14
+# =========================================================
+
+with tab14:
+
+    st.subheader(
+        "Time Series Cross Validation"
+    )
+
+    tscv = TimeSeriesSplit(n_splits=5)
+
+    cv_scores = []
+
+    for train_index, test_index in tscv.split(X):
+
+        X_train_cv = X.iloc[train_index]
+        X_test_cv = X.iloc[test_index]
+
+        y_train_cv = y.iloc[train_index]
+        y_test_cv = y.iloc[test_index]
+
+        model_cv = GradientBoostingRegressor()
+
+        model_cv.fit(
+            X_train_cv,
+            y_train_cv
+        )
+
+        preds_cv = model_cv.predict(
+            X_test_cv
+        )
+
+        rmse_cv = np.sqrt(
+            mean_squared_error(
+                y_test_cv,
+                preds_cv
+            )
+        )
+
+        cv_scores.append(rmse_cv)
+
+    cv_df = pd.DataFrame({
+
+        'Fold': [
+            'Fold 1',
+            'Fold 2',
+            'Fold 3',
+            'Fold 4',
+            'Fold 5'
+        ],
+
+        'RMSE': cv_scores
+    })
+
+    st.dataframe(
+        cv_df,
         use_container_width=True
     )
 
