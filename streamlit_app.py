@@ -914,6 +914,7 @@ with tabs[9]:
 
 # =========================================================
 # TAB 11 SURGE ANALYSIS
+# FIXED VERSION
 # =========================================================
 
 with tabs[10]:
@@ -940,9 +941,9 @@ with tabs[10]:
         ],
 
         'Forecast Load': [
-            np.mean(gb_preds),
-            np.mean(moderate_preds),
-            np.mean(extreme_preds)
+            float(np.mean(gb_preds)),
+            float(np.mean(moderate_preds)),
+            float(np.mean(extreme_preds))
         ]
     })
 
@@ -954,9 +955,12 @@ with tabs[10]:
 
         y='Forecast Load',
 
-        color='Forecast Load',
+        color='Forecast Load'
+    )
 
-        text_auto='.2f'
+    fig_surge.update_traces(
+        text=surge_df['Forecast Load'].round(2),
+        textposition='outside'
     )
 
     apply_theme(fig_surge)
